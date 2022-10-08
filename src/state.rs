@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use winit::{
     event::WindowEvent,
     window::Window,
@@ -5,10 +7,12 @@ use winit::{
 
 use crate::graph::Graph;
 
+//TODO: move state into a renderer object, and create renderer methods for creating buffers and such, this will keep things separated
+//and allow us to organize render passes on such on the renderer, look at https://github.com/EQMG/Acid
 pub struct State {
     surface: wgpu::Surface,
     pub device: wgpu::Device,
-    queue: wgpu::Queue,
+    pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     graph: Option<Graph>
@@ -83,6 +87,10 @@ impl State {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
         }
+        //send a resize event to our graph
+        if let Some(graph) = &mut self.graph {
+            graph.resize(new_size);
+        }
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
@@ -107,19 +115,19 @@ impl State {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
 
         
         if let Some(graph) = &self.graph {
+            let output = self.surface.get_current_texture()?;
+            let view = output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
             let encoder = graph.render(&self, &view);
             self.queue.submit(std::iter::once(encoder.finish()));
+            output.present();
         }
 
         // submit will accept anything that implements IntoIter
-        output.present();
 
         Ok(())
     }

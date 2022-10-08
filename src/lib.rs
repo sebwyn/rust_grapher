@@ -1,6 +1,5 @@
 pub mod state;
 pub mod graph;
-pub mod model;
 
 use state::State;
 
