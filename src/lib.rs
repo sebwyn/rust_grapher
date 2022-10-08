@@ -1,4 +1,6 @@
-mod state;
+pub mod state;
+pub mod graph;
+pub mod model;
 
 use state::State;
 
@@ -8,6 +10,7 @@ use winit::{
     window::WindowBuilder,
 };
 
+//for now we're doing event based updates, when there are no more events we draw to the screen
 pub async fn run() {
     env_logger::init();
     let event_loop = EventLoop::new();
@@ -32,13 +35,7 @@ pub async fn run() {
                     },
                 ..
             } => *control_flow = ControlFlow::Exit,
-            WindowEvent::Resized(physical_size) => {
-                state.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                state.resize(**new_inner_size);
-            },
-            W => { state.input(W); }
+            w => { state.input(w); }
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
             state.update();
