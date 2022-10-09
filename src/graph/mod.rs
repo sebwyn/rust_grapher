@@ -1,5 +1,5 @@
-mod graph;
-mod graph_camera;
+mod camera;
 mod graph_vertex;
+mod graph_renderer;
 
-pub use graph::Graph;
+pub use graph_renderer::GraphRenderer;

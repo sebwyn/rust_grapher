@@ -1,24 +1,15 @@
-use std::borrow::Borrow;
+use winit::window::Window;
 
-use winit::{
-    event::WindowEvent,
-    window::Window,
-};
-
-use crate::graph::Graph;
-
-//TODO: move state into a renderer object, and create renderer methods for creating buffers and such, this will keep things separated
-//and allow us to organize render passes on such on the renderer, look at https://github.com/EQMG/Acid
-pub struct State {
-    surface: wgpu::Surface,
+//this is a helper class that will be included by any renderer, so that render contexts dont need to be created in each renderer
+pub struct RenderContext {
+    pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    pub size: winit::dpi::PhysicalSize<u32>,
-    graph: Option<Graph>
+    pub size: winit::dpi::PhysicalSize<u32>
 }
 
-impl State {
+impl RenderContext {
     // Creating some of the wgpu types requires async code
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
@@ -64,20 +55,13 @@ impl State {
         };
         surface.configure(&device, &config);
 
-        let mut instance = Self {
+        Self {
             surface,
             device,
             queue,
             config,
             size,
-            graph: None
-        };
-
-        //start creating components here
-
-        instance.graph = Some(Graph::new(&instance));
-
-        instance
+        }
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -87,48 +71,6 @@ impl State {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
         }
-        //send a resize event to our graph
-        if let Some(graph) = &mut self.graph {
-            graph.resize(new_size);
-        }
-    }
-
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            //handle resizes
-            WindowEvent::Resized(physical_size) => {
-                self.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                self.resize(**new_inner_size);
-            },
-            //pass our input to the graph
-            e => { if let Some(graph) = &self.graph { graph.event(e) } }
-        }
-        false
-    }
-
-    pub fn update(&mut self) {
-        if let Some(graph) = &mut self.graph {
-            graph.update();
-        }
-    }
-
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-
-        
-        if let Some(graph) = &self.graph {
-            let output = self.surface.get_current_texture()?;
-            let view = output
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            let encoder = graph.render(&self, &view);
-            self.queue.submit(std::iter::once(encoder.finish()));
-            output.present();
-        }
-
-        // submit will accept anything that implements IntoIter
-
-        Ok(())
+        //pass the new aspect to the renderer
     }
 }

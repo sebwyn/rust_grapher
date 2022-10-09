@@ -9,14 +9,14 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 );
 
 #[derive(Clone)]
-pub struct GraphCamera {
+pub struct CameraController {
     view_ortho_matrix: cgmath::Matrix4<f32>,
     center_x: f32, center_y: f32,
     scale: f32,
     aspect: (f32, f32)
 }
 
-impl GraphCamera {
+impl CameraController {
     pub fn new(center_x: f32, center_y: f32, aspect: (f32, f32)) -> Self {
         //generate a default scale from the aspect, assuming each unit is 10px
 
@@ -81,12 +81,12 @@ impl GraphCamera {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct GraphCameraUniform {
+pub struct CameraUniform {
     pub view_ortho: [[f32; 4]; 4],
 }
 
-impl From<GraphCamera> for GraphCameraUniform {
-    fn from(value: GraphCamera) -> Self {
+impl From<CameraController> for CameraUniform {
+    fn from(value: CameraController) -> Self {
         Self {
             view_ortho: value.get_view_ortho_matrix().into()
         }
