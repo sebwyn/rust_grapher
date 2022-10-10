@@ -1,12 +1,13 @@
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
-use super::{camera::{CameraController, CameraUniform}, graph_vertex::Vertex};
-use crate::{
-    render_context::RenderContext, renderer::Renderer,
+use super::{
+    camera::{CameraController, CameraUniform},
+    graph_vertex::Vertex,
 };
+use crate::{render_context::RenderContext, renderer::Renderer};
 
-const GRAPH_VERTICES: [Vertex; 4] = [
+const GRAPH_VERTICES: [Vertex; 8] = [
     Vertex {
         position: [-0.5, -10000.0, 0.0],
         color: [0.0, 0.0, 0.0],
@@ -23,15 +24,32 @@ const GRAPH_VERTICES: [Vertex; 4] = [
         position: [0.5, 10000.0, 0.0],
         color: [0.0, 0.0, 0.0],
     },
+
+    Vertex {
+        position: [-10000.0, -0.5, 0.0],
+        color: [0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-10000.0, 0.5, 0.0],
+        color: [0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [10000.0, -0.5, 0.0],
+        color: [0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [10000.0, 0.5, 0.0],
+        color: [0.0, 0.0, 0.0],
+    },
 ];
 
-const GRAPH_INDICES: [u16; 6] = [0, 1, 2, 3, 2, 1];
+const GRAPH_INDICES: [u16; 12] = [0, 1, 2, 3, 2, 1, 4, 5, 6, 7, 6, 5];
 
 //TODO: creating future renderers will be simpler if i abstract out the idea of a uniform
 pub struct GraphRenderer {
     render_context: RenderContext,
-    _camera: CameraController,
-    _camera_buffer: wgpu::Buffer,
+    camera_controller: CameraController,
+    camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
     background_color: wgpu::Color,
@@ -48,7 +66,7 @@ impl GraphRenderer {
         let render_context = RenderContext::new(window).await;
 
         //create our camera here
-        let (camera, camera_buffer, camera_bind_group_layout, camera_bind_group) =
+        let (camera_controller, camera_buffer, camera_bind_group_layout, camera_bind_group) =
             Self::create_camera_uniform(&render_context);
 
         //create the render_pipeline here
@@ -75,12 +93,17 @@ impl GraphRenderer {
                 });
         let num_indices = GRAPH_INDICES.len() as u32;
 
-        let background_color = wgpu::Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0};
+        let background_color = wgpu::Color {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0,
+        };
 
         Self {
             render_context,
-            _camera: camera,
-            _camera_buffer: camera_buffer,
+            camera_controller,
+            camera_buffer,
             camera_bind_group,
             render_pipeline,
             background_color,
@@ -216,7 +239,7 @@ impl GraphRenderer {
 }
 
 impl Renderer for GraphRenderer {
-    fn render(&self) -> Result<(), wgpu::SurfaceError>{
+    fn render(&self) -> Result<(), wgpu::SurfaceError> {
         //render using our pipeline
         let output = self.render_context.surface.get_current_texture()?;
         let view = output
@@ -251,7 +274,9 @@ impl Renderer for GraphRenderer {
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
-        self.render_context.queue.submit(std::iter::once(encoder.finish()));
+        self.render_context
+            .queue
+            .submit(std::iter::once(encoder.finish()));
 
         output.present();
 
@@ -259,16 +284,23 @@ impl Renderer for GraphRenderer {
     }
 
     fn resize(&mut self, new_size: Option<winit::dpi::PhysicalSize<u32>>) {
+        //passing resize events to the render context
         if let Some(size) = new_size {
             self.render_context.resize(size);
+
+            //pass resize events to the cam controller, and update our camera uniforms
+            self.camera_controller.resize((size.width, size.height));
+            let camera_uniform: CameraUniform = self.camera_controller.clone().into();
+            self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_uniform]));
+            
         } else {
             self.render_context.resize(self.render_context.size);
         }
     }
 
-    fn event(&self, event: &winit::event::WindowEvent) -> bool {
+    fn event(&mut self, event: &winit::event::WindowEvent) -> bool {
         match event {
-            _ => false
+            e => { self.camera_controller.event(e) },
         }
     }
 }
