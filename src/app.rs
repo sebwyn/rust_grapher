@@ -4,7 +4,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-use crate::{graph::GraphRenderer, renderer::Renderer};
+use crate::{graph::{GraphCameraController, GraphRenderer}, renderer::Renderer};
 
 pub struct App;
 
@@ -20,8 +20,11 @@ impl App {
             .unwrap();
 
         //create our renderer and our graph here
-        let mut renderer = GraphRenderer::new(&window).await;
+        let mut cam_controller = GraphCameraController::new(0f32, 0f32, window.inner_size());
+        let mut renderer = GraphRenderer::new(&window, &cam_controller).await;
 
+        //store a flag for if our view changed and then update all the components before rendering
+        let mut view_changed = false;
         event_loop.run(move |event, _, control_flow| match event {
             Event::WindowEvent {
                 ref event,
@@ -38,20 +41,32 @@ impl App {
                     ..
                 } => *control_flow = ControlFlow::Exit,
                 //handle resizes
-                WindowEvent::Resized(physical_size) => {
+                WindowEvent::Resized(new_size) => {
                     //resize the renderer
                     //resize the ECS
-                    renderer.resize(Some(*physical_size));
+                    renderer.resize(Some(*new_size));
+                    cam_controller.resize(*new_size);
+                    view_changed = true;
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                     renderer.resize(Some(**new_inner_size));
+                    cam_controller.resize(**new_inner_size);
+                    view_changed = true;
                 },
                 e => {
-                    //pass the event to the renderer and any components
-                    renderer.event(e);
+                    //pass the events to our cam controller (which is kind of a component)
+                    view_changed = cam_controller.event(e);
+                    //pass events to our other components in theory
                 }
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
+                if view_changed {
+                    //update our renderer and other components here
+                    renderer.update_view(&cam_controller);
+                    //update our other components here
+                    
+                    view_changed = false;
+                }
                 match renderer.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if lost

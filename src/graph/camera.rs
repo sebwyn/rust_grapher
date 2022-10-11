@@ -1,5 +1,12 @@
-use cgmath::Zero;
-use winit::{event::{WindowEvent::{self, MouseInput, CursorMoved, MouseWheel}, ElementState, MouseButton, MouseScrollDelta}, dpi::PhysicalPosition};
+use winit::{
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::{
+        ElementState, MouseButton, MouseScrollDelta,
+        WindowEvent::{self, CursorMoved, MouseInput, MouseWheel},
+    },
+};
+
+use super::view::View;
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -10,41 +17,48 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 );
 
 //TODO: Zooming in always zooms in on the center, make it move the camera towards where your zooming and
-//change the scale
 #[derive(Clone)]
-pub struct CameraController {
-    view_ortho_matrix: cgmath::Matrix4<f32>,
-    center_x: f32, center_y: f32,
+pub struct GraphCameraController {
+    center_x: f32,
+    center_y: f32,
+    aspect: PhysicalSize<u32>,
+    //these bounds are in graph space but relative to the camera
+    left: f32,
+    right: f32,
+    bottom: f32,
+    top: f32,
     scale: f32,
-    aspect: (f32, f32),
     //for handling events
     pressed: bool, //for if the left mouse button is pressed
     start_press: PhysicalPosition<f64>,
 }
 
-impl CameraController {
-    pub fn new(center_x: f32, center_y: f32, aspect: (f32, f32)) -> Self {
+impl GraphCameraController {
+    pub fn new(center_x: f32, center_y: f32, aspect: PhysicalSize<u32>) -> Self {
         //generate a default scale from the aspect, assuming each unit is 10px
-
         let mut instance = Self {
-            view_ortho_matrix: cgmath::Matrix4::zero(),
             center_x,
             center_y,
             aspect,
+            //view elements 
+            left: 0f32,
+            right: 0f32,
+            bottom: 0f32,
+            top: 0f32,
             scale: 10.0,
             pressed: false,
-            start_press: (-1f64, -1f64).into()
+            start_press: (-1f64, -1f64).into(),
         };
-        instance.update();
-
+        instance.update_bounds();
         instance
     }
 
-    pub fn resize(&mut self, aspect: (u32, u32)) {
-        self.aspect = (aspect.0 as f32, aspect.1 as f32);
-        self.update();
+    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
+        self.aspect = new_size;
+        self.update_bounds();
     }
 
+    //return true if the view changed
     pub fn event(&mut self, event: &WindowEvent) -> bool {
         match event {
             //toggle pressed
@@ -52,11 +66,11 @@ impl CameraController {
                 state: ElementState::Pressed,
                 button: MouseButton::Left,
                 ..
-            } => { 
-                self.pressed = true; 
-                self.start_press =  PhysicalPosition {x: -1f64, y: -1f64};//set start press in here
+            } => {
+                self.pressed = true;
+                self.start_press = PhysicalPosition { x: -1f64, y: -1f64 }; //set start press in here
                 false
-            },
+            }
             MouseInput {
                 state: ElementState::Released,
                 button: MouseButton::Left,
@@ -64,89 +78,97 @@ impl CameraController {
             } => {
                 self.pressed = false;
                 false
-            },
-            CursorMoved {
-                position,
-                ..
-            } if self.pressed => {
+            }
+            CursorMoved { position, .. } if self.pressed => {
                 //set our start press if start_press is 0
                 if self.start_press.x != -1f64 {
-                    let dx = - (position.x - self.start_press.x) as f32 / self.scale as f32;
+                    let dx = -(position.x - self.start_press.x) as f32 / self.scale as f32;
                     let dy = (position.y - self.start_press.y) as f32 / self.scale as f32;
                     self.translate(dx, dy);
+                    self.start_press = *position;
+                    true
+                }  else {
+                    self.start_press = *position;
+                    false
                 }
-                self.start_press = *position;
-                false
-            },
+            }
             MouseWheel {
-                delta: MouseScrollDelta::PixelDelta(PhysicalPosition {y, ..}),
+                delta: MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }),
                 ..
             } => {
-                //change the scale based on the y scroll
-                self.scale += (-*y / 100.0f64) as f32;
-                if self.scale < 1.1f32 {
-                    self.scale = 1.1f32;
-                }
-                self.update();
-                false
+                //use the y-scroll for a zoom coefficient
+                let zoom_coefficient = (-*y / 100.0f64) as f32;
+                //get the mouse position here, convert to graph space and pass to zoom
+                self.zoom((0f32, 0f32), zoom_coefficient);
+                true
             }
             //handle the mouse cursor movements if pressd
-            _ => false
+            _ => false,
         }
-    }
-
-    pub fn get_view_ortho_matrix(&self) -> cgmath::Matrix4<f32> {
-        self.view_ortho_matrix
     }
 
     fn translate(&mut self, dx: f32, dy: f32) {
         self.center_x += dx;
         self.center_y += dy;
-        self.update();
     }
 
-    fn update(&mut self) {
-        //update with the aspect ratio here
-        let x_steps = self.aspect.0 / self.scale;
-        let y_steps = self.aspect.1 / self.scale;
-        let left = -(x_steps / 2.0);
-        let right = x_steps / 2.0;
-        let bottom = -(y_steps / 2.0);
-        let top = y_steps / 2.0;
-
-        self.view_ortho_matrix = Self::build_view(self.center_x, self.center_y, left, right, bottom, top);
+    fn zoom(&mut self, _position: (f32, f32), zoom_coefficient: f32) {
+        //for now jankily change the scale based on the zoom coefficent and resize with the new scale
+        self.scale += zoom_coefficient;
+        if self.scale < 1.1f32 {
+            self.scale = 1.1f32;
+        }
+        self.update_bounds();
     }
 
-    fn build_view(
-        center_x: f32,
-        center_y: f32,
-        left: f32,
-        right: f32,
-        bottom: f32,
-        top: f32
-    ) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_lh(
-            (center_x, center_y, 0f32).into(),
-            (center_x, center_y, 1f32).into(),
-            cgmath::Vector3::<f32>::unit_y(),
-        );
+    fn update_bounds(&mut self) {
+        //resize keeping the center in the center
+        let x_steps = self.aspect.width as f32 / self.scale;
+        let y_steps = self.aspect.height as f32 / self.scale;
 
-        let ortho = cgmath::ortho(left, right, bottom, top, 1f32, -1f32);
-
-        OPENGL_TO_WGPU_MATRIX * ortho * view
+        self.left = -(x_steps / 2.0);
+        self.right = x_steps / 2.0;
+        self.bottom = -(y_steps / 2.0);
+        self.top = y_steps / 2.0;
     }
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CameraUniform {
+pub struct CameraMatrix {
     pub view_ortho: [[f32; 4]; 4],
 }
 
-impl From<CameraController> for CameraUniform {
-    fn from(value: CameraController) -> Self {
-        Self {
-            view_ortho: value.get_view_ortho_matrix().into()
+//cam controller should be cloned before calling into as 
+//generally we want to keep these things alive, this should be a relatively cheap clone
+
+//these should probably be into traits not froms
+impl Into<CameraMatrix> for GraphCameraController {
+    fn into(self) -> CameraMatrix {
+        //construct the matrices here
+        let view = cgmath::Matrix4::look_at_lh(
+            (self.center_x, self.center_y, 0f32).into(),
+            (self.center_x, self.center_y, 1f32).into(),
+            cgmath::Vector3::<f32>::unit_y(),
+        );
+        let ortho = cgmath::ortho(self.left, self.right, self.bottom, self.top, 1f32, -1f32);
+        let combined_matrix = OPENGL_TO_WGPU_MATRIX * ortho * view;
+
+        CameraMatrix {
+            view_ortho: combined_matrix.into(),
+        }
+    }
+}
+
+impl Into<View> for GraphCameraController {
+    fn into(self) -> View {
+        //put local camera bounds into a graph space
+        View {
+            left: self.center_x + self.left,
+            right: self.center_x + self.right,
+            bottom: self.center_y + self.bottom,
+            top: self.center_y + self.top,
+            scale: self.scale,
         }
     }
 }

@@ -2,7 +2,7 @@ use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use super::{
-    camera::{CameraController, CameraUniform},
+    camera::{GraphCameraController, CameraMatrix},
     vertex::Vertex, line::{Line, LineVertexListBuilder}
 };
 use crate::{render_context::RenderContext, renderer::Renderer};
@@ -18,9 +18,9 @@ use crate::{render_context::RenderContext, renderer::Renderer};
 //along with all the other objects that need to adapt to a changing view
 pub struct GraphRenderer {
     render_context: RenderContext,
-    camera_controller: CameraController,
     render_pipeline: wgpu::RenderPipeline,
     background_color: wgpu::Color,
+
     //this is uniform information
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -33,17 +33,19 @@ pub struct GraphRenderer {
 
 impl GraphRenderer {
     //TODO: support multiple renderers by passing a reference to a render context
-    pub async fn new(window: &Window) -> Self {
+    //pass a camera object here that we can use and update outside of the renderer
+    //but that we construct a renderer with so we can construct from that view
+    pub async fn new(window: &Window, cam_controller: &GraphCameraController) -> Self {
         //create a render context
         let render_context = RenderContext::new(window).await;
 
-        //create our camera here
-        let (camera_controller, camera_buffer, camera_bind_group_layout, camera_bind_group) =
-            Self::create_camera_uniform(&render_context);
+        //create our camera uniform here
+        let (camera_buffer, camera_bind_group_layout, camera_bind_group) =
+            Self::construct_camera_uniform(&render_context, cam_controller);
 
         //create the render_pipeline here
         let render_pipeline =
-            Self::create_render_pipeline(&render_context, &[&camera_bind_group_layout]);
+            Self::construct_render_pipeline(&render_context, &[&camera_bind_group_layout]);
 
         //generate 2 lines here
         let vertex_list_builder = LineVertexListBuilder::new();
@@ -84,7 +86,6 @@ impl GraphRenderer {
 
         Self {
             render_context,
-            camera_controller,
             camera_buffer,
             camera_bind_group,
             render_pipeline,
@@ -96,24 +97,28 @@ impl GraphRenderer {
         }
     }
 
+    pub fn update_view(&mut self, cam_controller: &GraphCameraController) {
+        let camera_matrix: CameraMatrix = cam_controller.clone().into();
+        self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_matrix]));
+    }
+
     //this is constructing a camera uniform
-    fn create_camera_uniform(
+    fn construct_camera_uniform(
         render_context: &RenderContext,
+        cam_controller: &GraphCameraController
     ) -> (
-        CameraController,
         wgpu::Buffer,
         wgpu::BindGroupLayout,
         wgpu::BindGroup,
     ) {
-        let camera = CameraController::new(0f32, 0f32, render_context.size.into());
-        let camera_uniform: CameraUniform = camera.clone().into();
+        let camera_matrix: CameraMatrix = cam_controller.clone().into();
 
         let camera_buffer =
             render_context
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Camera Buffer"),
-                    contents: bytemuck::cast_slice(&[camera_uniform]),
+                    contents: bytemuck::cast_slice(&[camera_matrix]),
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 });
 
@@ -147,14 +152,13 @@ impl GraphRenderer {
                 });
 
         (
-            camera,
             camera_buffer,
             camera_bind_group_layout,
             camera_bind_group,
         )
     }
 
-    fn create_render_pipeline(
+    fn construct_render_pipeline(
         render_context: &RenderContext,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
     ) -> wgpu::RenderPipeline {
@@ -219,12 +223,6 @@ impl GraphRenderer {
 
         render_pipeline
     }
-
-    fn update_camera_uniform(&mut self) {
-        let camera_uniform: CameraUniform = self.camera_controller.clone().into();
-        //println!("Camera Uniform: {:?}", camera_uniform.view_ortho);
-        self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_uniform]));
-    }
 }
 
 impl Renderer for GraphRenderer {
@@ -272,27 +270,13 @@ impl Renderer for GraphRenderer {
         Ok(())
     }
 
+    //resize may be called with nothing signalling that we should reconfigure our render context
     fn resize(&mut self, new_size: Option<winit::dpi::PhysicalSize<u32>>) {
         //passing resize events to the render context
         if let Some(size) = new_size {
             self.render_context.resize(size);
-
-            //pass resize events to the cam controller, and update our camera uniforms
-            self.camera_controller.resize((size.width, size.height));
-            self.update_camera_uniform();
-            
         } else {
             self.render_context.resize(self.render_context.size);
-        }
-    }
-
-    fn event(&mut self, event: &winit::event::WindowEvent) -> bool {
-        match event {
-            e => {
-                let result = self.camera_controller.event(e);
-                self.update_camera_uniform();
-                result
-            },
         }
     }
 }
