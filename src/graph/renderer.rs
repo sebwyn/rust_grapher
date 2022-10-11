@@ -342,13 +342,8 @@ impl Renderer for GraphRenderer {
                 renderable.update(&view);
             }
             self.update_buffers();
-        } else {
-            //assume that if we have the same number of renderables that everythin is a ok, this is a bad assumption but will do for now
-            //the other option, build this every frame but have renderables cache their vertices
-            if self.renderables_len != self.renderables.borrow().len() {
-                self.update_buffers();
-                self.renderables_len = self.renderables.borrow().len();
-            }
+        } else if self.renderables.borrow().len() != self.renderables_len {
+            self.update_buffers();
         }
     }
 
