@@ -59,9 +59,6 @@ impl GraphRenderer {
         //create the render_pipeline here
         let render_pipeline =
             Self::construct_render_pipeline(&render_context, &[&camera_bind_group_layout]);
-
-        //generate 2 lines here
-        let vertex_list_builder = LineList::new();
         
         let vertices: Vec<Vertex> = Vec::new();
         let indices: Vec<u16> = Vec::new();
@@ -101,7 +98,7 @@ impl GraphRenderer {
 
             //camera info
             cam_controller,
-            view_changed: false,
+            view_changed: true, //update objects before rendering
 
             camera_buffer,
             camera_bind_group,
@@ -341,7 +338,7 @@ impl Renderer for GraphRenderer {
 
             let view = self.cam_controller.clone().into();
             //pass the updated view to our renderables and reconstruct
-            for renderable in self.renderables.borrow().iter() {
+            for renderable in self.renderables.borrow_mut().iter_mut() {
                 renderable.update(&view);
             }
             self.update_buffers();

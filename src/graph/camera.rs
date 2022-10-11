@@ -114,6 +114,8 @@ impl CameraController {
 
     fn zoom(&mut self, _position: (f32, f32), zoom_coefficient: f32) {
         //for now jankily change the scale based on the zoom coefficent and resize with the new scale
+        //zoom in exponential space
+        println!("zoom coefficient: {}", zoom_coefficient);
         self.scale += zoom_coefficient;
         if self.scale < 1.1f32 {
             self.scale = 1.1f32;
