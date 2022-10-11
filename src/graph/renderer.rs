@@ -1,9 +1,11 @@
+use std::{rc::Rc, cell::RefCell};
+
 use wgpu::util::DeviceExt;
-use winit::window::Window;
+use winit::{window::Window, event::WindowEvent};
 
 use super::{
-    camera::{GraphCameraController, CameraMatrix},
-    vertex::Vertex, line::{Line, LineVertexListBuilder}
+    camera::{CameraController, CameraMatrix},
+    vertex::Vertex, line::{LineList}, renderable::Renderable
 };
 use crate::{render_context::RenderContext, renderer::Renderer};
 
@@ -21,40 +23,48 @@ pub struct GraphRenderer {
     render_pipeline: wgpu::RenderPipeline,
     background_color: wgpu::Color,
 
-    //this is uniform information
+    //our camera information
+    cam_controller: CameraController,
+    view_changed: bool,
+    //this is camera uniform information
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 
-    //remove this code
+    //early ECS concept
+    renderables: Rc<RefCell<Vec<Box<dyn Renderable>>>>,
+
+    //trying to only update renderables when we need to (probably have some kind of edited flag later)
+    renderables_len: usize,
+
+    //cached vertex and index buffers
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
-    num_indices: u32,
+    num_indices: u32
 }
 
 impl GraphRenderer {
     //TODO: support multiple renderers by passing a reference to a render context
     //pass a camera object here that we can use and update outside of the renderer
     //but that we construct a renderer with so we can construct from that view
-    pub async fn new(window: &Window, cam_controller: &GraphCameraController) -> Self {
+    pub async fn new(window: &Window, renderables: Rc<RefCell<Vec<Box<dyn Renderable>>>>) -> Self {
+
+        let cam_controller = CameraController::new(0f32, 0f32, window.inner_size());
         //create a render context
         let render_context = RenderContext::new(window).await;
 
         //create our camera uniform here
         let (camera_buffer, camera_bind_group_layout, camera_bind_group) =
-            Self::construct_camera_uniform(&render_context, cam_controller);
+            Self::construct_camera_uniform(&render_context, &cam_controller);
 
         //create the render_pipeline here
         let render_pipeline =
             Self::construct_render_pipeline(&render_context, &[&camera_bind_group_layout]);
 
         //generate 2 lines here
-        let vertex_list_builder = LineVertexListBuilder::new();
-        let vertex_list = vertex_list_builder
-            .add_line(Line {width: 0.5f32, start: (0f32, -10000f32), end: (0f32, 10000f32), color: [0f32, 0f32, 0f32]})
-            .add_line(Line {width: 0.5f32, start: (-10000f32, 0f32), end: (10000f32, 0f32), color: [0f32, 0f32, 0f32]})
-            .add_line(Line {width: 0.25f32, start: (0f32, 0f32), end: (10f32, 10f32), color: [1f32, 0f32, 0f32]});
-        let vertices = vertex_list.vertices;
-        let indices = vertex_list.indices;
+        let vertex_list_builder = LineList::new();
+        
+        let vertices: Vec<Vertex> = Vec::new();
+        let indices: Vec<u16> = Vec::new();
         println!("{:?}", vertices);
 
         //TODO remove this test code
@@ -86,26 +96,31 @@ impl GraphRenderer {
 
         Self {
             render_context,
-            camera_buffer,
-            camera_bind_group,
             render_pipeline,
             background_color,
-            //remove these
+
+            //camera info
+            cam_controller,
+            view_changed: false,
+
+            camera_buffer,
+            camera_bind_group,
+            
+            //ECS
+            renderables,
+
+            renderables_len: 0,
+
             vertex_buffer,
             index_buffer,
-            num_indices,
+            num_indices
         }
-    }
-
-    pub fn update_view(&mut self, cam_controller: &GraphCameraController) {
-        let camera_matrix: CameraMatrix = cam_controller.clone().into();
-        self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_matrix]));
     }
 
     //this is constructing a camera uniform
     fn construct_camera_uniform(
         render_context: &RenderContext,
-        cam_controller: &GraphCameraController
+        cam_controller: &CameraController
     ) -> (
         wgpu::Buffer,
         wgpu::BindGroupLayout,
@@ -223,6 +238,39 @@ impl GraphRenderer {
 
         render_pipeline
     }
+
+    fn update_buffers(&mut self) {
+        //iterate over renderables and construct a line list
+        //lots of copying here very very expensive
+        let mut lines = LineList::new();
+        for ll in self.renderables.borrow().iter() {
+            let mut next_lines = ll.get_lines();
+            lines.append(&mut next_lines);
+        }
+
+        let vertices: Vec<Vertex> = lines.vertices;
+        let indices: Vec<u16> = lines.indices;
+
+        //TODO remove this test code
+        self.vertex_buffer =
+            self.render_context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(vertices.as_slice()),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+        self.index_buffer =
+            self.render_context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Index Buffer"),
+                    contents: bytemuck::cast_slice(indices.as_slice()),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
+        self.num_indices = indices.len() as u32;
+    }
 }
 
 impl Renderer for GraphRenderer {
@@ -275,8 +323,40 @@ impl Renderer for GraphRenderer {
         //passing resize events to the render context
         if let Some(size) = new_size {
             self.render_context.resize(size);
+            //resize our camera
+            self.cam_controller.resize(size);
+            self.view_changed = true;
         } else {
             self.render_context.resize(self.render_context.size);
         }
+
+        //send resize events to registered renderable components with a camera view
+    }
+
+    fn update(&mut self) {
+        //update our camera if the view has changed since the last update
+        if self.view_changed {
+            let camera_matrix: CameraMatrix = self.cam_controller.clone().into();
+            self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_matrix]));
+
+            let view = self.cam_controller.clone().into();
+            //pass the updated view to our renderables and reconstruct
+            for renderable in self.renderables.borrow().iter() {
+                renderable.update(&view);
+            }
+            self.update_buffers();
+        } else {
+            //assume that if we have the same number of renderables that everythin is a ok, this is a bad assumption but will do for now
+            //the other option, build this every frame but have renderables cache their vertices
+            if self.renderables_len != self.renderables.borrow().len() {
+                self.update_buffers();
+                self.renderables_len = self.renderables.borrow().len();
+            }
+        }
+    }
+
+    //pass events to our cam controller
+    fn event(&mut self, event: &WindowEvent) {
+        self.view_changed = self.cam_controller.event(event);
     }
 }

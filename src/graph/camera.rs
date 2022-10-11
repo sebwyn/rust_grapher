@@ -18,7 +18,7 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 
 //TODO: Zooming in always zooms in on the center, make it move the camera towards where your zooming and
 #[derive(Clone)]
-pub struct GraphCameraController {
+pub struct CameraController {
     center_x: f32,
     center_y: f32,
     aspect: PhysicalSize<u32>,
@@ -33,7 +33,7 @@ pub struct GraphCameraController {
     start_press: PhysicalPosition<f64>,
 }
 
-impl GraphCameraController {
+impl CameraController {
     pub fn new(center_x: f32, center_y: f32, aspect: PhysicalSize<u32>) -> Self {
         //generate a default scale from the aspect, assuming each unit is 10px
         let mut instance = Self {
@@ -143,7 +143,7 @@ pub struct CameraMatrix {
 //generally we want to keep these things alive, this should be a relatively cheap clone
 
 //these should probably be into traits not froms
-impl Into<CameraMatrix> for GraphCameraController {
+impl Into<CameraMatrix> for CameraController {
     fn into(self) -> CameraMatrix {
         //construct the matrices here
         let view = cgmath::Matrix4::look_at_lh(
@@ -160,7 +160,7 @@ impl Into<CameraMatrix> for GraphCameraController {
     }
 }
 
-impl Into<View> for GraphCameraController {
+impl Into<View> for CameraController {
     fn into(self) -> View {
         //put local camera bounds into a graph space
         View {

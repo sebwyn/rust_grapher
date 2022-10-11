@@ -3,6 +3,11 @@ mod line;
 mod vertex;
 mod renderer;
 mod view;
+mod renderable;
+mod grid_lines;
 
 pub use renderer::GraphRenderer;
-pub use camera::GraphCameraController;
+
+//expose components to the app
+pub use grid_lines::GridLines;
+pub use renderable::Renderable;

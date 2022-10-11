@@ -53,12 +53,13 @@ impl Line {
 }
 
 //TODO: maybe make this private members with getters
-pub struct LineVertexListBuilder {
+#[derive(Clone)]
+pub struct LineList {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u16>
 }
 
-impl LineVertexListBuilder {
+impl LineList {
     pub fn new() -> Self {
         Self {
             vertices: Vec::new(),
@@ -66,20 +67,32 @@ impl LineVertexListBuilder {
         }
     }
 
-    pub fn add_line(&self, line: Line) -> Self {
+    pub fn add_line(&mut self, line: Line) {
         let vertices_size = self.vertices.len() as u16;
         let mut line_vertices = line.get_vertices();
-        let mut vertices = self.vertices.clone();
-        vertices.append(&mut line_vertices);
+        self.vertices.append(&mut line_vertices);
 
         let line_indices = line.get_indices();
         let mut adjusted_indices: Vec<u16> = line_indices.iter().map(|i| i + vertices_size).collect();
-        let mut indices = self.indices.clone();
-        indices.append(&mut adjusted_indices);
+        self.indices.append(&mut adjusted_indices);
+    }
 
-        Self {
-            vertices,
-            indices
+    //be able to append line lists
+    pub fn append(&mut self, other: &mut LineList) {
+        let vertices_size = self.vertices.len() as u16;
+        self.vertices.append(&mut other.vertices);
+
+        let mut adjusted_indices: Vec<u16> = other.indices.iter().map(|i| i + vertices_size).collect();
+        self.indices.append(&mut adjusted_indices);
+    }
+}
+
+impl From<Vec<Line>> for LineList {
+    fn from(vec: Vec<Line>) -> Self {
+        let mut line_list = LineList::new();
+        for line in vec {
+            line_list.add_line(line);
         }
+        line_list
     }
 }
