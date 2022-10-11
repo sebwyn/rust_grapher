@@ -6,7 +6,7 @@ pub struct View {
     pub top: f32,
     pub center_x: f32,
     pub center_y: f32,
-    pub scale: f32 
+    pub aspect: (f32, f32) 
 }
 
 //so one thing to think about is that literally everything goes through the renderer in a way

@@ -1,4 +1,3 @@
-use cgmath::num_traits::Pow;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{
@@ -22,7 +21,7 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 pub struct CameraController {
     center_x: f32,
     center_y: f32,
-    aspect: PhysicalSize<u32>,
+    resolution: PhysicalSize<u32>,
     //these bounds are in graph space but relative to the camera
     left: f32,
     right: f32,
@@ -37,12 +36,12 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    pub fn new(center_x: f32, center_y: f32, aspect: PhysicalSize<u32>) -> Self {
+    pub fn new(center_x: f32, center_y: f32, resolution: PhysicalSize<u32>) -> Self {
         //generate a default scale from the aspect, assuming each unit is 10px
         let mut instance = Self {
             center_x,
             center_y,
-            aspect,
+            resolution,
             //view elements 
             left: 0f32,
             right: 0f32,
@@ -59,7 +58,7 @@ impl CameraController {
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-        self.aspect = new_size;
+        self.resolution = new_size;
         self.update_bounds();
     }
 
@@ -130,8 +129,8 @@ impl CameraController {
 
     fn update_bounds(&mut self) {
         //resize keeping the center in the center
-        let x_steps = self.aspect.width as f32 / 2.0 / self.scale;
-        let y_steps = self.aspect.height as f32 / 2.0 / self.scale;
+        let x_steps = self.resolution.width as f32 / 2.0 / self.scale;
+        let y_steps = self.resolution.height as f32 / 2.0 / self.scale;
 
         self.left = -x_steps;
         self.right = x_steps;
@@ -171,6 +170,10 @@ impl Into<CameraMatrix> for CameraController {
 impl Into<View> for CameraController {
     fn into(self) -> View {
         //put local camera bounds into a graph space
+        let mut aspect = (0f32, 0f32);
+        aspect.0 = (self.right - self.left) / self.resolution.width as f32;
+        aspect.1 = (self.top - self.bottom) / self.resolution.height as f32;
+
         View {
             left: self.center_x + self.left,
             right: self.center_x + self.right,
@@ -178,7 +181,7 @@ impl Into<View> for CameraController {
             top: self.center_y + self.top,
             center_x: self.center_x,
             center_y: self.center_y,
-            scale: self.scale,
+            aspect,
         }
     }
 }

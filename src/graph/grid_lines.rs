@@ -40,19 +40,19 @@ impl Renderable for GridLines {
         //get the starting x
         let mut x = f32::trunc(view.left / step) * step;
         while x < view.right {
-            self.lines.add_line(VerticalLine::new(x, 5f32 / view.scale, [0.3, 0.3, 0.3]));
+            self.lines.add_line(VerticalLine::new(x, 2f32, [0.3, 0.3, 0.3]), view);
             x += step;
         }
 
         let mut y = f32::trunc(view.bottom / step) * step;
         while y < view.top {
-            self.lines.add_line(HorizontalLine::new(y, 5f32 / view.scale, [0.3, 0.3, 0.3]));
+            self.lines.add_line(HorizontalLine::new(y, 2f32, [0.3, 0.3, 0.3]), view);
             y += step;
         }
 
-        self.lines.add_line(VerticalLine::new(0f32, 5f32 / view.scale, [0f32, 0f32, 0f32]));
-        self.lines.add_line(HorizontalLine::new(0f32, 5f32 / view.scale, [0f32, 0f32, 0f32]));
-        self.lines.add_line(Line {width: 5f32 / view.scale, start: (0f32, 0f32), end: (64f32, 64f32), color: [1f32, 0f32, 0f32]});
+        self.lines.add_line(VerticalLine::new(0f32, 4f32, [0f32, 0f32, 0f32]), view);
+        self.lines.add_line(HorizontalLine::new(0f32, 4f32, [0f32, 0f32, 0f32]), view);
+        self.lines.add_line(Line {width: 3f32, start: (0f32, 0f32), end: (64f32, 64f32), color: [1f32, 0f32, 0f32]}, view);
     }
 
     fn get_lines(&self) -> LineList {

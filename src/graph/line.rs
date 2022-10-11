@@ -1,4 +1,4 @@
-use super::vertex::Vertex;
+use super::{vertex::Vertex, view::View};
 
 //another option is to instance draw, this will use more memory and is probably worse
 //but may make updating cpu vertex buffers more simple
@@ -19,13 +19,13 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn get_vertices(&self) -> Vec<Vertex> {
+    pub fn get_vertices(&self, view: &View) -> Vec<Vertex> {
         let half_width = self.width / 2f32;
         let se_length = ((self.start.0 - self.end.0).powf(2f32) + (self.start.1 - self.end.1).powf(2f32)).sqrt();
         let sf = half_width / se_length;
         let sign_correction = -1f32 * ((self.end.1 - self.start.1) / (self.end.0 - self.start.0)).signum(); //ensures the sign is opposite the sign of the line
-        let dx = sign_correction * sf * (self.end.1 - self.start.1);
-        let dy = sf * (self.end.0 - self.start.0);
+        let dx = sign_correction * sf * (self.end.1 - self.start.1) * view.aspect.0;
+        let dy = sf * (self.end.0 - self.start.0) * view.aspect.1;
         let vertices = vec![
             Vertex {
                 position: [self.start.0 - dx, self.start.1 - dy],
@@ -67,9 +67,17 @@ impl LineList {
         }
     }
 
-    pub fn add_line(&mut self, line: Line) {
+    pub fn construct_from_vec(vec: Vec<Line>, view: &View) -> Self {
+        let mut line_list = LineList::new();
+        for line in vec {
+            line_list.add_line(line, view);
+        }
+        line_list
+    }
+
+    pub fn add_line(&mut self, line: Line, view: &View) {
         let vertices_size = self.vertices.len() as u16;
-        let mut line_vertices = line.get_vertices();
+        let mut line_vertices = line.get_vertices(view);
         self.vertices.append(&mut line_vertices);
 
         let line_indices = line.get_indices();
@@ -84,15 +92,5 @@ impl LineList {
 
         let mut adjusted_indices: Vec<u16> = other.indices.iter().map(|i| i + vertices_size).collect();
         self.indices.append(&mut adjusted_indices);
-    }
-}
-
-impl From<Vec<Line>> for LineList {
-    fn from(vec: Vec<Line>) -> Self {
-        let mut line_list = LineList::new();
-        for line in vec {
-            line_list.add_line(line);
-        }
-        line_list
     }
 }
