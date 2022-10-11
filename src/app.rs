@@ -25,7 +25,7 @@ impl App {
         let renderables: Rc<RefCell<Vec<Box<dyn Renderable>>>> = Rc::new(RefCell::new(Vec::new()));
         //create our renderer and our graph here
         let mut renderer = GraphRenderer::new(&window, renderables.clone()).await;
-        renderables.borrow_mut().push(Box::new(GridLines::new()));
+        renderables.borrow_mut().push(Box::new(GridLines {}));
 
         //store a flag for if our view changed and then update all the components before rendering
         event_loop.run(move |event, _, control_flow| match event {

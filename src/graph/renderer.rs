@@ -5,9 +5,9 @@ use winit::{window::Window, event::WindowEvent};
 
 use super::{
     camera::{CameraController, CameraMatrix},
-    vertex::Vertex, line::{LineList}, renderable::Renderable, view::View
+    vertex::Vertex, line::{LineList, Line}, renderable::Renderable, view::View
 };
-use crate::{render_context::RenderContext, renderer::Renderer};
+use crate::{render_context::RenderContext, renderer::Renderer, graph::camera};
 
 //TODO: creating future renderers will be simpler if i abstract out the idea of a uniform
 //idea for a point renderer, render a square and then turn it into a circle in the fragment shader
@@ -124,6 +124,7 @@ impl GraphRenderer {
         wgpu::BindGroup,
     ) {
         let camera_matrix: CameraMatrix = cam_controller.clone().into();
+        println!("{:?}", camera_matrix);
 
         let camera_buffer =
             render_context
@@ -242,8 +243,9 @@ impl GraphRenderer {
         let view: View = self.cam_controller.clone().into();
         let mut lines = LineList::new();
         for ll in self.renderables.borrow().iter() {
-            let next_lines = ll.get_lines();
-            lines.append_vec(next_lines, &view);
+            let mut next_lines: Vec<Line> = Vec::new();
+            ll.generate_lines(&mut next_lines, &view);
+            lines.append_vec(&next_lines, &view);
         }
 
         let vertices: Vec<Vertex> = lines.vertices;
@@ -333,18 +335,16 @@ impl Renderer for GraphRenderer {
 
     fn update(&mut self) {
         //update our camera if the view has changed since the last update
+        let new_renderable_len: usize = self.renderables.borrow().len();
         if self.view_changed {
             let camera_matrix: CameraMatrix = self.cam_controller.clone().into();
             self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_matrix]));
 
-            let view = self.cam_controller.clone().into();
-            //pass the updated view to our renderables and reconstruct
-            for renderable in self.renderables.borrow_mut().iter_mut() {
-                renderable.update(&view);
-            }
             self.update_buffers();
-        } else if self.renderables.borrow().len() != self.renderables_len {
+        } else if new_renderable_len != self.renderables_len {
+            //update everything because we don't know whats new
             self.update_buffers();
+            self.renderables_len = new_renderable_len;
         }
     }
 
