@@ -3,47 +3,9 @@ use winit::window::Window;
 
 use super::{
     camera::{CameraController, CameraUniform},
-    graph_vertex::Vertex,
+    graph_vertex::Vertex, line::{Line, LineVertexListBuilder}
 };
 use crate::{render_context::RenderContext, renderer::Renderer};
-
-const GRAPH_VERTICES: [Vertex; 8] = [
-    Vertex {
-        position: [-0.5, -10000.0, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-    Vertex {
-        position: [0.5, -10000.0, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-    Vertex {
-        position: [-0.5, 10000.0, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-    Vertex {
-        position: [0.5, 10000.0, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-
-    Vertex {
-        position: [-10000.0, -0.5, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-    Vertex {
-        position: [-10000.0, 0.5, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-    Vertex {
-        position: [10000.0, -0.5, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-    Vertex {
-        position: [10000.0, 0.5, 0.0],
-        color: [0.0, 0.0, 0.0],
-    },
-];
-
-const GRAPH_INDICES: [u16; 12] = [0, 1, 2, 3, 2, 1, 4, 5, 6, 7, 6, 5];
 
 //TODO: creating future renderers will be simpler if i abstract out the idea of a uniform
 pub struct GraphRenderer {
@@ -73,13 +35,22 @@ impl GraphRenderer {
         let render_pipeline =
             Self::create_render_pipeline(&render_context, &[&camera_bind_group_layout]);
 
+        //generate 2 lines here
+        let vertex_list_builder = LineVertexListBuilder::new();
+        let vertex_list = vertex_list_builder
+            .add_line(Line {width: 0.5f32, start: (0f32, -10000f32), end: (0f32, 10000f32), color: [0f32, 0f32, 0f32]})
+            .add_line(Line {width: 0.25f32, start: (0f32, 0f32), end: (10f32, 10f32), color: [0f32, 0f32, 0f32]})
+            .add_line(Line {width: 0.5f32, start: (-10000f32, 0f32), end: (10000f32, 0f32), color: [0f32, 0f32, 0f32]});
+        let vertices = vertex_list.vertices;
+        let indices = vertex_list.indices;
+
         //TODO remove this test code
         let vertex_buffer =
             render_context
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(GRAPH_VERTICES.as_slice()),
+                    contents: bytemuck::cast_slice(vertices.as_slice()),
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
@@ -88,10 +59,10 @@ impl GraphRenderer {
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(GRAPH_INDICES.as_slice()),
+                    contents: bytemuck::cast_slice(indices.as_slice()),
                     usage: wgpu::BufferUsages::INDEX,
                 });
-        let num_indices = GRAPH_INDICES.len() as u32;
+        let num_indices = indices.len() as u32;
 
         let background_color = wgpu::Color {
             r: 1.0,
@@ -236,6 +207,12 @@ impl GraphRenderer {
 
         render_pipeline
     }
+
+    fn update_camera_uniform(&mut self) {
+        let camera_uniform: CameraUniform = self.camera_controller.clone().into();
+        //println!("Camera Uniform: {:?}", camera_uniform.view_ortho);
+        self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_uniform]));
+    }
 }
 
 impl Renderer for GraphRenderer {
@@ -290,8 +267,7 @@ impl Renderer for GraphRenderer {
 
             //pass resize events to the cam controller, and update our camera uniforms
             self.camera_controller.resize((size.width, size.height));
-            let camera_uniform: CameraUniform = self.camera_controller.clone().into();
-            self.render_context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[camera_uniform]));
+            self.update_camera_uniform();
             
         } else {
             self.render_context.resize(self.render_context.size);
@@ -300,7 +276,11 @@ impl Renderer for GraphRenderer {
 
     fn event(&mut self, event: &winit::event::WindowEvent) -> bool {
         match event {
-            e => { self.camera_controller.event(e) },
+            e => {
+                let result = self.camera_controller.event(e);
+                self.update_camera_uniform();
+                result
+            },
         }
     }
 }

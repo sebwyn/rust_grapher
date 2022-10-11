@@ -1,5 +1,5 @@
 use cgmath::Zero;
-use winit::{event::{WindowEvent::{self, MouseInput, CursorMoved}, ElementState, MouseButton}, dpi::PhysicalPosition};
+use winit::{event::{WindowEvent::{self, MouseInput, CursorMoved, MouseWheel}, ElementState, MouseButton, MouseScrollDelta}, dpi::PhysicalPosition};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -9,6 +9,8 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     0.0, 0.0, 0.5, 1.0,
 );
 
+//TODO: Zooming in always zooms in on the center, make it move the camera towards where your zooming and
+//change the scale
 #[derive(Clone)]
 pub struct CameraController {
     view_ortho_matrix: cgmath::Matrix4<f32>,
@@ -68,16 +70,26 @@ impl CameraController {
                 ..
             } if self.pressed => {
                 //set our start press if start_press is 0
-                if self.start_press.x == -1f64 {
-                    self.start_press = *position;
-                } else {
-                    let dx = (position.x - self.start_press.x) as f32 / self.scale as f32;
+                if self.start_press.x != -1f64 {
+                    let dx = - (position.x - self.start_press.x) as f32 / self.scale as f32;
                     let dy = (position.y - self.start_press.y) as f32 / self.scale as f32;
                     self.translate(dx, dy);
                 }
-
+                self.start_press = *position;
                 false
             },
+            MouseWheel {
+                delta: MouseScrollDelta::PixelDelta(PhysicalPosition {x, y}),
+                ..
+            } => {
+                //change the scale based on the y scroll
+                self.scale += (-*y / 100.0f64) as f32;
+                if self.scale < 1.1f32 {
+                    self.scale = 1.1f32;
+                }
+                self.update();
+                false
+            }
             //handle the mouse cursor movements if pressd
             _ => false
         }
@@ -110,8 +122,8 @@ impl CameraController {
         center_y: f32,
         left: f32,
         right: f32,
-        top: f32,
-        bottom: f32
+        bottom: f32,
+        top: f32
     ) -> cgmath::Matrix4<f32> {
         let view = cgmath::Matrix4::look_at_lh(
             (center_x, center_y, 0f32).into(),
