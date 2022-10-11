@@ -1,5 +1,16 @@
-use super::graph_vertex::Vertex;
+use super::vertex::Vertex;
 
+//another option is to instance draw, this will use more memory and is probably worse
+//but may make updating cpu vertex buffers more simple
+
+//we're basically going to need a way to decide what lines to pass to our renderer
+//because we're working in infinite space
+
+//graph objects such as equations and gridlines need to be smart and understand what lines to generate
+//based on a given view
+
+//this means that we're regenerating every time the view changes
+//objects need to be smart and know how to update themselves and when to update themselves based on the view
 pub struct Line {
     pub width: f32, //width in graph space
     pub start: (f32, f32),

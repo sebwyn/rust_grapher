@@ -3,18 +3,28 @@ use winit::window::Window;
 
 use super::{
     camera::{CameraController, CameraUniform},
-    graph_vertex::Vertex, line::{Line, LineVertexListBuilder}
+    vertex::Vertex, line::{Line, LineVertexListBuilder}
 };
 use crate::{render_context::RenderContext, renderer::Renderer};
 
 //TODO: creating future renderers will be simpler if i abstract out the idea of a uniform
+//idea for a point renderer, render a square and then turn it into a circle in the fragment shader
+//also give an option of whether to render points as circles or squares
+
+//need to think about the separation of renderer and camera object
+//for example the current thought process, is that we should be able to construct 
+//a matrix from a view object, which means we can update camera whenever and then
+//render with a view, or update a renderer whenever the view updates
+//along with all the other objects that need to adapt to a changing view
 pub struct GraphRenderer {
     render_context: RenderContext,
     camera_controller: CameraController,
-    camera_buffer: wgpu::Buffer,
-    camera_bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
     background_color: wgpu::Color,
+    //this is uniform information
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
+
     //remove this code
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -39,10 +49,11 @@ impl GraphRenderer {
         let vertex_list_builder = LineVertexListBuilder::new();
         let vertex_list = vertex_list_builder
             .add_line(Line {width: 0.5f32, start: (0f32, -10000f32), end: (0f32, 10000f32), color: [0f32, 0f32, 0f32]})
-            .add_line(Line {width: 0.25f32, start: (0f32, 0f32), end: (10f32, 10f32), color: [0f32, 0f32, 0f32]})
-            .add_line(Line {width: 0.5f32, start: (-10000f32, 0f32), end: (10000f32, 0f32), color: [0f32, 0f32, 0f32]});
+            .add_line(Line {width: 0.5f32, start: (-10000f32, 0f32), end: (10000f32, 0f32), color: [0f32, 0f32, 0f32]})
+            .add_line(Line {width: 0.25f32, start: (0f32, 0f32), end: (10f32, 10f32), color: [1f32, 0f32, 0f32]});
         let vertices = vertex_list.vertices;
         let indices = vertex_list.indices;
+        println!("{:?}", vertices);
 
         //TODO remove this test code
         let vertex_buffer =
@@ -85,6 +96,7 @@ impl GraphRenderer {
         }
     }
 
+    //this is constructing a camera uniform
     fn create_camera_uniform(
         render_context: &RenderContext,
     ) -> (
@@ -150,7 +162,7 @@ impl GraphRenderer {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("graph_line.wgsl").into()),
+                source: wgpu::ShaderSource::Wgsl(include_str!("line.wgsl").into()),
             });
 
         let render_pipeline_layout =

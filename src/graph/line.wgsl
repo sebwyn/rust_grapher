@@ -24,6 +24,11 @@ fn vs_main(
     return out;
 }
 
+//possibility to do rounded corners here if we interpolate a value a 2d
+//value and then filter that value if it is too great
+//requires us understanding what index or position this is of the rect
+//we could also obviously draw points at the end with rounded corners
+//would let us do fill or no fill as well
 @fragment
 fn fs_main(in: VertexOutput1) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color, 1.0);

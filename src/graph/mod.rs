@@ -1,6 +1,6 @@
 mod camera;
 mod line;
-mod graph_vertex;
-mod graph_renderer;
+mod vertex;
+mod renderer;
 
-pub use graph_renderer::GraphRenderer;
+pub use renderer::GraphRenderer;

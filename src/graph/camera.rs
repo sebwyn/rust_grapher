@@ -79,7 +79,7 @@ impl CameraController {
                 false
             },
             MouseWheel {
-                delta: MouseScrollDelta::PixelDelta(PhysicalPosition {x, y}),
+                delta: MouseScrollDelta::PixelDelta(PhysicalPosition {y, ..}),
                 ..
             } => {
                 //change the scale based on the y scroll
