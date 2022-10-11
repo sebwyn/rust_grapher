@@ -3,16 +3,16 @@ use super::{renderable::Renderable, line::{LineList, Line}, view::View};
 struct VerticalLine;
 
 impl VerticalLine {
-    fn new(x: f32, width: f32, color: [f32; 3]) -> Line {
-        Line {width, start: (x, -10000f32), end: (x, 10000f32), color}
+    fn new(x: f32, bottom: f32, top: f32, width: f32, color: [f32; 3]) -> Line {
+        Line {width, start: (x, bottom), end: (x, top), color}
     }
 }
 
 struct HorizontalLine;
 
 impl HorizontalLine {
-    fn new(y: f32, width: f32, color: [f32; 3]) -> Line {
-        Line {width, start: (-10000f32, y), end: (10000f32, y), color}
+    fn new(y: f32, left: f32, right: f32, width: f32, color: [f32; 3]) -> Line {
+        Line {width, start: (left, y), end: (right, y), color}
     }
 }
 
@@ -40,18 +40,18 @@ impl Renderable for GridLines {
         //get the starting x
         let mut x = f32::trunc(view.left / step) * step;
         while x < view.right {
-            self.lines.add_line(VerticalLine::new(x, 2f32, [0.3, 0.3, 0.3]), view);
+            self.lines.add_line(VerticalLine::new(x, view.bottom, view.top, 2f32, [0.3, 0.3, 0.3]), view);
             x += step;
         }
 
         let mut y = f32::trunc(view.bottom / step) * step;
         while y < view.top {
-            self.lines.add_line(HorizontalLine::new(y, 2f32, [0.3, 0.3, 0.3]), view);
+            self.lines.add_line(HorizontalLine::new(y, view.left, view.right, 2f32, [0.3, 0.3, 0.3]), view);
             y += step;
         }
 
-        self.lines.add_line(VerticalLine::new(0f32, 4f32, [0f32, 0f32, 0f32]), view);
-        self.lines.add_line(HorizontalLine::new(0f32, 4f32, [0f32, 0f32, 0f32]), view);
+        self.lines.add_line(VerticalLine::new(0f32, view.bottom, view.top, 4f32, [0f32, 0f32, 0f32]), view);
+        self.lines.add_line(HorizontalLine::new(0f32, view.left, view.right, 4f32, [0f32, 0f32, 0f32]), view);
         self.lines.add_line(Line {width: 3f32, start: (0f32, 0f32), end: (64f32, 64f32), color: [1f32, 0f32, 0f32]}, view);
     }
 
