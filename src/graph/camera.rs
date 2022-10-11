@@ -136,7 +136,6 @@ impl CameraController {
         self.right = x_steps;
         self.bottom = -y_steps;
         self.top = y_steps;
-        println!("left: {}, right: {}, bottom: {}, top: {}, scale: {}", self.left, self.right, self.bottom, self.top, self.scale);
     }
 }
 

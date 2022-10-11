@@ -67,7 +67,7 @@ impl LineList {
         }
     }
 
-    pub fn construct_from_vec(vec: Vec<Line>, view: &View) -> Self {
+    pub fn _construct_from_vec(vec: &Vec<Line>, view: &View) -> Self {
         let mut line_list = LineList::new();
         for line in vec {
             line_list.add_line(line, view);
@@ -75,7 +75,7 @@ impl LineList {
         line_list
     }
 
-    pub fn add_line(&mut self, line: Line, view: &View) {
+    pub fn add_line(&mut self, line: &Line, view: &View) {
         let vertices_size = self.vertices.len() as u16;
         let mut line_vertices = line.get_vertices(view);
         self.vertices.append(&mut line_vertices);
@@ -86,11 +86,17 @@ impl LineList {
     }
 
     //be able to append line lists
-    pub fn append(&mut self, other: &mut LineList) {
+    pub fn _append(&mut self, other: &mut LineList) {
         let vertices_size = self.vertices.len() as u16;
         self.vertices.append(&mut other.vertices);
 
         let mut adjusted_indices: Vec<u16> = other.indices.iter().map(|i| i + vertices_size).collect();
         self.indices.append(&mut adjusted_indices);
+    }
+
+    pub fn append_vec(&mut self, vec: &Vec<Line>, view: &View) {
+        for line in vec {
+            self.add_line(line, view)
+        }
     }
 }
