@@ -4,6 +4,8 @@ pub struct View {
     pub right: f32,
     pub bottom: f32,
     pub top: f32,
+    pub center_x: f32,
+    pub center_y: f32,
     pub scale: f32 
 }
 

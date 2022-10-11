@@ -1,3 +1,4 @@
+use cgmath::num_traits::Pow;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{
@@ -27,6 +28,8 @@ pub struct CameraController {
     right: f32,
     bottom: f32,
     top: f32,
+
+    zoom: f32,
     scale: f32,
     //for handling events
     pressed: bool, //for if the left mouse button is pressed
@@ -45,7 +48,9 @@ impl CameraController {
             right: 0f32,
             bottom: 0f32,
             top: 0f32,
-            scale: 10.0,
+
+            zoom: 1.0,
+            scale: 2.0,
             pressed: false,
             start_press: (-1f64, -1f64).into(),
         };
@@ -97,9 +102,9 @@ impl CameraController {
                 ..
             } => {
                 //use the y-scroll for a zoom coefficient
-                let zoom_coefficient = (-*y / 100.0f64) as f32;
+                let dzoom = (-*y / 1000.0f64) as f32;
                 //get the mouse position here, convert to graph space and pass to zoom
-                self.zoom((0f32, 0f32), zoom_coefficient);
+                self.zoom((0f32, 0f32), dzoom);
                 true
             }
             //handle the mouse cursor movements if pressd
@@ -112,26 +117,27 @@ impl CameraController {
         self.center_y += dy;
     }
 
-    fn zoom(&mut self, _position: (f32, f32), zoom_coefficient: f32) {
+    fn zoom(&mut self, _position: (f32, f32), dzoom: f32) {
         //for now jankily change the scale based on the zoom coefficent and resize with the new scale
         //zoom in exponential space
-        println!("zoom coefficient: {}", zoom_coefficient);
-        self.scale += zoom_coefficient;
-        if self.scale < 1.1f32 {
+        self.zoom += dzoom;
+        self.scale = 2.0f32.powf(-self.zoom);
+        /*if self.scale < 1.1f32 {
             self.scale = 1.1f32;
-        }
+        }*/
         self.update_bounds();
     }
 
     fn update_bounds(&mut self) {
         //resize keeping the center in the center
-        let x_steps = self.aspect.width as f32 / self.scale;
-        let y_steps = self.aspect.height as f32 / self.scale;
+        let x_steps = self.aspect.width as f32 / 2.0 / self.scale;
+        let y_steps = self.aspect.height as f32 / 2.0 / self.scale;
 
-        self.left = -(x_steps / 2.0);
-        self.right = x_steps / 2.0;
-        self.bottom = -(y_steps / 2.0);
-        self.top = y_steps / 2.0;
+        self.left = -x_steps;
+        self.right = x_steps;
+        self.bottom = -y_steps;
+        self.top = y_steps;
+        println!("left: {}, right: {}, bottom: {}, top: {}, scale: {}", self.left, self.right, self.bottom, self.top, self.scale);
     }
 }
 
@@ -170,6 +176,8 @@ impl Into<View> for CameraController {
             right: self.center_x + self.right,
             bottom: self.center_y + self.bottom,
             top: self.center_y + self.top,
+            center_x: self.center_x,
+            center_y: self.center_y,
             scale: self.scale,
         }
     }

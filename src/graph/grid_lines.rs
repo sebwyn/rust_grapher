@@ -35,12 +35,8 @@ impl Renderable for GridLines {
     fn update(&mut self, view: &View) {
         self.lines = LineList::new();
 
-        //calculate the first line x we need to draw
-        let pixels_between_lines: f32 = 100f32;
-        let mut step = f32::trunc(pixels_between_lines / view.scale);
-        if f32::trunc(step) == 0.0 {
-            step = 5f32;
-        }
+        let incs_to_top = 5f32;
+        let step = 2f32.powf(f32::trunc(f32::log2((view.top - view.center_y) / incs_to_top)));
         //get the starting x
         let mut x = f32::trunc(view.left / step) * step;
         while x < view.right {
@@ -56,7 +52,7 @@ impl Renderable for GridLines {
 
         self.lines.add_line(VerticalLine::new(0f32, 5f32 / view.scale, [0f32, 0f32, 0f32]));
         self.lines.add_line(HorizontalLine::new(0f32, 5f32 / view.scale, [0f32, 0f32, 0f32]));
-        self.lines.add_line(Line {width: 5f32 / view.scale, start: (0f32, 0f32), end: (90f32, 90f32), color: [1f32, 0f32, 0f32]});
+        self.lines.add_line(Line {width: 5f32 / view.scale, start: (0f32, 0f32), end: (64f32, 64f32), color: [1f32, 0f32, 0f32]});
     }
 
     fn get_lines(&self) -> LineList {
