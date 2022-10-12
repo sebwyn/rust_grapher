@@ -17,8 +17,8 @@ cgmath = "0.18.0"
 [dependencies.rendering]
 path = "../rendering"
 
-[dependencies.twoD]
-path = "../twoD"
+[dependencies.two_dimensional]
+path = "../two_dimensional"
 
 [dependencies.image]
 version = "0.24"

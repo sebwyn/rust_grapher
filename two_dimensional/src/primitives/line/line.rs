@@ -1,4 +1,4 @@
-use super::Vertex;
+use super::LineVertex;
 
 use crate::View;
 
@@ -18,7 +18,7 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn get_vertices(&self, view: &View) -> Vec<Vertex> {
+    pub fn get_vertices(&self, view: &View) -> Vec<LineVertex> {
         //some fancy trigonometry for generating 4 points from start and end of line
         //could probably do some math optimization here
         let half_width = self.width / 2f32;
@@ -28,19 +28,19 @@ impl Line {
         let dx = sign_correction * sf * (self.end.1 - self.start.1).abs() * view.aspect.0;
         let dy = sf * (self.end.0 - self.start.0).abs() * view.aspect.1;
         let vertices = vec![
-            Vertex {
+            LineVertex {
                 position: [self.start.0 - dx, self.start.1 - dy],
                 color: self.color,
             },
-            Vertex {
+            LineVertex {
                 position: [self.start.0 + dx, self.start.1 + dy],
                 color: self.color,
             },
-            Vertex {
+            LineVertex {
                 position: [self.end.0 - dx, self.end.1 - dy],
                 color: self.color,
             },
-            Vertex {
+            LineVertex {
                 position: [self.end.0 + dx, self.end.1 + dy],
                 color: self.color,
             },
@@ -56,7 +56,7 @@ impl Line {
 //TODO: maybe make this private members with getters
 #[derive(Clone)]
 pub struct LineList {
-    vertices: Vec<Vertex>,
+    vertices: Vec<LineVertex>,
     indices: Vec<u16>
 }
 
@@ -101,7 +101,7 @@ impl LineList {
         }
     }
 
-    pub fn vertices(&self) -> &[Vertex] {
+    pub fn vertices(&self) -> &[LineVertex] {
         self.vertices.as_ref()
     }
 

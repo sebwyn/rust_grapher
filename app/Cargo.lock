@@ -1135,6 +1135,10 @@ checksum = "f1382d1f0a252c4bf97dc20d979a2fdd05b024acd7c2ed0f7595d7817666a157"
 [[package]]
 name = "rendering"
 version = "0.1.0"
+dependencies = [
+ "wgpu",
+ "winit",
+]
 
 [[package]]
 name = "rust_grapher"
@@ -1147,7 +1151,7 @@ dependencies = [
  "log",
  "pollster",
  "rendering",
- "twoD",
+ "two_dimensional",
  "wgpu",
  "winit",
 ]
@@ -1360,11 +1364,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "twoD"
+name = "two_dimensional"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "cgmath",
  "rendering",
+ "wgpu",
  "winit",
 ]
 
