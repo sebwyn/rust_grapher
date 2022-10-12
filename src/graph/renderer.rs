@@ -243,8 +243,7 @@ impl GraphRenderer {
         let view: View = self.cam_controller.clone().into();
         let mut lines = LineList::new();
         for ll in self.renderables.borrow().iter() {
-            let mut next_lines: Vec<Line> = Vec::new();
-            ll.generate_lines(&mut next_lines, &view);
+            let next_lines: Vec<Line> = ll.generate_lines(&view);
             lines.append_vec(&next_lines, &view);
         }
 

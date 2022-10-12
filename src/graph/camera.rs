@@ -22,17 +22,19 @@ pub struct CameraController {
     center_x: f32,
     center_y: f32,
     resolution: PhysicalSize<u32>,
+    aspect: (f32, f32),
     //these bounds are in graph space but relative to the camera
     left: f32,
     right: f32,
     bottom: f32,
     top: f32,
 
-    zoom: f32,
     scale: f32,
     //for handling events
     pressed: bool, //for if the left mouse button is pressed
     start_press: PhysicalPosition<f64>,
+    start_position: (f32, f32),
+    cursor_pos: PhysicalPosition<f64>,
 }
 
 impl CameraController {
@@ -42,24 +44,28 @@ impl CameraController {
             center_x,
             center_y,
             resolution,
-            //view elements 
+            aspect: (0f32, 0f32),
+            //view elements
             left: 0f32,
             right: 0f32,
             bottom: 0f32,
             top: 0f32,
 
-            zoom: 1.0,
             scale: 2.0,
+
             pressed: false,
-            start_press: (-1f64, -1f64).into(),
+            start_press: (-1f32, -1f32).into(), //start press in screen space
+            start_position: (0f32, 0f32),       //the center when we started pressing
+            cursor_pos: (-1f32, -1f32).into(),  //cursor position passed around in events
         };
-        instance.update_bounds();
+        instance.update();
+        //instance.zoom((0f32, 0f32).into(), 0f32); //update the zoom
         instance
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         self.resolution = new_size;
-        self.update_bounds();
+        self.update();
     }
 
     //return true if the view changed
@@ -72,7 +78,8 @@ impl CameraController {
                 ..
             } => {
                 self.pressed = true;
-                self.start_press = PhysicalPosition { x: -1f64, y: -1f64 }; //set start press in here
+                self.start_press = self.cursor_pos; //set start press in here
+                self.start_position = (self.center_x, self.center_y);
                 false
             }
             MouseInput {
@@ -83,16 +90,17 @@ impl CameraController {
                 self.pressed = false;
                 false
             }
-            CursorMoved { position, .. } if self.pressed => {
-                //set our start press if start_press is 0
-                if self.start_press.x != -1f64 {
-                    let dx = -(position.x - self.start_press.x) as f32 / self.scale as f32;
-                    let dy = (position.y - self.start_press.y) as f32 / self.scale as f32;
-                    self.translate(dx, dy);
-                    self.start_press = *position;
+            CursorMoved { position, .. } => {
+                self.cursor_pos = *position;
+                if self.pressed {
+                    //convert position to graph space
+                    self.center_x = self.start_position.0
+                        - (position.x - self.start_press.x) as f32 / self.scale;
+                    self.center_y = self.start_position.1
+                        + (position.y - self.start_press.y) as f32 / self.scale;
+                    self.update();
                     true
-                }  else {
-                    self.start_press = *position;
+                } else {
                     false
                 }
             }
@@ -102,8 +110,7 @@ impl CameraController {
             } => {
                 //use the y-scroll for a zoom coefficient
                 let dzoom = (-*y / 1000.0f64) as f32;
-                //get the mouse position here, convert to graph space and pass to zoom
-                self.zoom((0f32, 0f32), dzoom);
+                self.zoom(self.cursor_pos, dzoom);
                 true
             }
             //handle the mouse cursor movements if pressd
@@ -111,31 +118,44 @@ impl CameraController {
         }
     }
 
-    fn translate(&mut self, dx: f32, dy: f32) {
-        self.center_x += dx;
-        self.center_y += dy;
+    fn zoom(&mut self, position: PhysicalPosition<f64>, dzoom: f32) {
+        //zoom in on a point, dont really get this code
+        //calculate a global top
+        let zoom = 2.0f32.powf(-dzoom);
+
+        //convert the position to graph space for later
+        let x = self.left + position.x as f32 / self.scale;
+        let y = self.top - position.y as f32 / self.scale;
+
+        //calculate the old positio
+        let og_x = position.x as f32;
+        let og_y = position.y as f32;
+
+        self.scale *= zoom;
+        self.update();
+
+        let new_x = (x - self.left) * self.scale;
+        let new_y = (self.top - y) * self.scale;
+
+        //and then translate so that the mouse stays at the same position
+        self.center_x += (new_x - og_x) / self.scale;
+        self.center_y -= (new_y - og_y) / self.scale;
+        self.update();
     }
 
-    fn zoom(&mut self, _position: (f32, f32), dzoom: f32) {
-        //for now jankily change the scale based on the zoom coefficent and resize with the new scale
-        //zoom in exponential space
-        self.zoom += dzoom;
-        self.scale = 2.0f32.powf(-self.zoom);
-        /*if self.scale < 1.1f32 {
-            self.scale = 1.1f32;
-        }*/
-        self.update_bounds();
-    }
+    fn update(&mut self) {
+        //update the bounds
+        let right_relative = self.resolution.width as f32 / 2.0 / self.scale;
+        let top_relative = self.resolution.height as f32 / 2.0 / self.scale;
 
-    fn update_bounds(&mut self) {
-        //resize keeping the center in the center
-        let x_steps = self.resolution.width as f32 / 2.0 / self.scale;
-        let y_steps = self.resolution.height as f32 / 2.0 / self.scale;
+        self.left = self.center_x - right_relative;
+        self.right = self.center_x + right_relative;
+        self.bottom = self.center_y - top_relative;
+        self.top = self.center_y + top_relative;
 
-        self.left = -x_steps;
-        self.right = x_steps;
-        self.bottom = -y_steps;
-        self.top = y_steps;
+        //update the aspect
+        self.aspect.0 = (self.right - self.left) / self.resolution.width as f32;
+        self.aspect.1 = (self.top - self.bottom) / self.resolution.height as f32;
     }
 }
 
@@ -145,7 +165,7 @@ pub struct CameraMatrix {
     pub view_ortho: [[f32; 4]; 4],
 }
 
-//cam controller should be cloned before calling into as 
+//cam controller should be cloned before calling into as
 //generally we want to keep these things alive, this should be a relatively cheap clone
 
 //these should probably be into traits not froms
@@ -157,7 +177,13 @@ impl Into<CameraMatrix> for CameraController {
             (self.center_x, self.center_y, 1f32).into(),
             cgmath::Vector3::<f32>::unit_y(),
         );
-        let ortho = cgmath::ortho(self.left, self.right, self.bottom, self.top, 1f32, -1f32);
+        //relative top, bottom, left, right
+        let left = self.left - self.center_x;
+        let right = self.right - self.center_x;
+        let bottom = self.bottom - self.center_y;
+        let top = self.top - self.center_y;
+
+        let ortho = cgmath::ortho(left, right, bottom, top, 1f32, -1f32);
         let combined_matrix = OPENGL_TO_WGPU_MATRIX * ortho * view;
 
         CameraMatrix {
@@ -168,19 +194,14 @@ impl Into<CameraMatrix> for CameraController {
 
 impl Into<View> for CameraController {
     fn into(self) -> View {
-        //put local camera bounds into a graph space
-        let mut aspect = (0f32, 0f32);
-        aspect.0 = (self.right - self.left) / self.resolution.width as f32;
-        aspect.1 = (self.top - self.bottom) / self.resolution.height as f32;
-
         View {
-            left: self.center_x + self.left,
-            right: self.center_x + self.right,
-            bottom: self.center_y + self.bottom,
-            top: self.center_y + self.top,
+            left: self.left,
+            right: self.right,
+            bottom: self.bottom,
+            top: self.top,
             center_x: self.center_x,
             center_y: self.center_y,
-            aspect,
+            aspect: self.aspect,
         }
     }
 }

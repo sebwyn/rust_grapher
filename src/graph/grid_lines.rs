@@ -23,8 +23,8 @@ pub struct GridLines;
 
 impl Renderable for GridLines {
     //TODO: make scale variable
-    fn generate_lines<'a>(&self, lines: &'a mut Vec<Line>, view: &View) -> &'a Vec<Line> {
-        *lines = Vec::new();
+    fn generate_lines(&self, view: &View) -> Vec<Line> {
+        let mut lines = Vec::new();
 
         let incs_to_top = 5f32;
         let step = 2f32.powf(f32::trunc(f32::log2((view.top - view.center_y) / incs_to_top)));
