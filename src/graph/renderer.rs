@@ -5,7 +5,7 @@ use winit::{window::Window, event::WindowEvent};
 
 use super::{
     camera::{CameraController, CameraMatrix},
-    vertex::Vertex, line::{LineList, Line}, renderable::Renderable, view::View
+    vertex::Vertex, line::LineList, renderable::Renderable, view::View
 };
 use crate::{render_context::RenderContext, renderer::Renderer};
 
@@ -218,7 +218,7 @@ impl GraphRenderer {
         let view: View = self.cam_controller.clone().into();
         let mut lines = LineList::new();
         for ll in self.renderables.borrow().iter() {
-            let next_lines: Vec<Line> = ll.generate_lines(&view);
+            let next_lines = ll.generate_lines(&view);
             lines.append_vec(&next_lines, &view);
         }
 

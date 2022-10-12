@@ -26,8 +26,8 @@ impl Line {
         let se_length = ((self.start.0 - self.end.0).powf(2f32) + (self.start.1 - self.end.1).powf(2f32)).sqrt();
         let sf = half_width / se_length;
         let sign_correction = -1f32 * ((self.end.1 - self.start.1) / (self.end.0 - self.start.0)).signum(); //ensures the sign is opposite the sign of the line
-        let dx = sign_correction * sf * (self.end.1 - self.start.1) * view.aspect.0;
-        let dy = sf * (self.end.0 - self.start.0) * view.aspect.1;
+        let dx = sign_correction * sf * (self.end.1 - self.start.1).abs() * view.aspect.0;
+        let dy = sf * (self.end.0 - self.start.0).abs() * view.aspect.1;
         let vertices = vec![
             Vertex {
                 position: [self.start.0 - dx, self.start.1 - dy],

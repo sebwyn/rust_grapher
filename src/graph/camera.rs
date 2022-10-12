@@ -200,6 +200,7 @@ impl Into<View> for CameraController {
             top: self.top,
             center_x: self.center_x,
             center_y: self.center_y,
+            scale: self.scale,
             aspect: self.aspect,
         }
     }

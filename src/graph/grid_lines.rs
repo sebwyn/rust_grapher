@@ -1,7 +1,6 @@
 use super::{renderable::Renderable, line::Line, view::View};
 
 struct VerticalLine;
-
 impl VerticalLine {
     fn new(x: f32, bottom: f32, top: f32, width: f32, color: [f32; 3]) -> Line {
         Line {width, start: (x, bottom), end: (x, top), color}
@@ -9,7 +8,6 @@ impl VerticalLine {
 }
 
 struct HorizontalLine;
-
 impl HorizontalLine {
     fn new(y: f32, left: f32, right: f32, width: f32, color: [f32; 3]) -> Line {
         Line {width, start: (left, y), end: (right, y), color}
@@ -46,8 +44,6 @@ impl Renderable for GridLines {
         //construct our axis in a different color
         lines.push(VerticalLine::new(0f32, view.bottom, view.top, 4f32, [0f32, 0f32, 0f32]));
         lines.push(HorizontalLine::new(0f32, view.left, view.right, 4f32, [0f32, 0f32, 0f32]));
-        //temp test of a line
-        lines.push(Line {width: 3f32, start: (0f32, 0f32), end: (64f32, 64f32), color: [1f32, 0f32, 0f32]});
 
         lines
     }

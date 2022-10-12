@@ -6,7 +6,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-use crate::{graph::{GraphRenderer, GridLines, Renderable}, renderer::Renderer};
+use crate::{graph::{GraphRenderer, GridLines, Renderable, Quadratic}, renderer::Renderer};
 
 pub struct App;
 
@@ -26,6 +26,7 @@ impl App {
         //create our renderer and our graph here
         let mut renderer = GraphRenderer::new(&window, renderables.clone()).await;
         renderables.borrow_mut().push(Box::new(GridLines {}));
+        renderables.borrow_mut().push(Box::new(Quadratic {}));
 
         //store a flag for if our view changed and then update all the components before rendering
         event_loop.run(move |event, _, control_flow| match event {
