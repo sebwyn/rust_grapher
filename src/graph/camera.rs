@@ -19,47 +19,46 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 //TODO: Zooming in always zooms in on the center, make it move the camera towards where your zooming and
 #[derive(Clone)]
 pub struct CameraController {
+    //used internally for converting screen to graph
+    scale: f32,
+    resolution: PhysicalSize<u32>,
+    //bounds in graph space used to make view
     center_x: f32,
     center_y: f32,
-    resolution: PhysicalSize<u32>,
-    aspect: (f32, f32),
-    //these bounds are in graph space but relative to the camera
     left: f32,
     right: f32,
     bottom: f32,
     top: f32,
+    aspect: (f32, f32), //used externally for drawing screen width things (lines)
 
-    scale: f32,
     //for handling events
     pressed: bool, //for if the left mouse button is pressed
-    start_press: PhysicalPosition<f64>,
-    start_position: (f32, f32),
-    cursor_pos: PhysicalPosition<f64>,
+    start_press: PhysicalPosition<f64>, //start press in screen space
+    start_position: (f32, f32), //the center when we started pressing
+    cursor_pos: PhysicalPosition<f64>, //cursor position passed around in events
 }
 
 impl CameraController {
     pub fn new(center_x: f32, center_y: f32, resolution: PhysicalSize<u32>) -> Self {
         //generate a default scale from the aspect, assuming each unit is 10px
         let mut instance = Self {
+            scale: 2.0,
+            resolution,
+
             center_x,
             center_y,
-            resolution,
-            aspect: (0f32, 0f32),
-            //view elements
             left: 0f32,
             right: 0f32,
             bottom: 0f32,
             top: 0f32,
-
-            scale: 2.0,
+            aspect: (0f32, 0f32),
 
             pressed: false,
-            start_press: (-1f32, -1f32).into(), //start press in screen space
-            start_position: (0f32, 0f32),       //the center when we started pressing
-            cursor_pos: (-1f32, -1f32).into(),  //cursor position passed around in events
+            start_press: (-1f32, -1f32).into(),
+            start_position: (-1f32, -1f32),
+            cursor_pos: (-1f32, -1f32).into(),
         };
-        instance.update();
-        //instance.zoom((0f32, 0f32).into(), 0f32); //update the zoom
+        instance.update(); //finish construction here
         instance
     }
 
@@ -168,7 +167,6 @@ pub struct CameraMatrix {
 //cam controller should be cloned before calling into as
 //generally we want to keep these things alive, this should be a relatively cheap clone
 
-//these should probably be into traits not froms
 impl Into<CameraMatrix> for CameraController {
     fn into(self) -> CameraMatrix {
         //construct the matrices here
@@ -177,7 +175,7 @@ impl Into<CameraMatrix> for CameraController {
             (self.center_x, self.center_y, 1f32).into(),
             cgmath::Vector3::<f32>::unit_y(),
         );
-        //relative top, bottom, left, right
+        //relative top, bottom, left, right (camera space)
         let left = self.left - self.center_x;
         let right = self.right - self.center_x;
         let bottom = self.bottom - self.center_y;
@@ -192,6 +190,7 @@ impl Into<CameraMatrix> for CameraController {
     }
 }
 
+//could be replaced for a method later, to avoid copying
 impl Into<View> for CameraController {
     fn into(self) -> View {
         View {

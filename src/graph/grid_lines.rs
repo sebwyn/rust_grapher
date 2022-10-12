@@ -28,21 +28,25 @@ impl Renderable for GridLines {
 
         let incs_to_top = 5f32;
         let step = 2f32.powf(f32::trunc(f32::log2((view.top - view.center_y) / incs_to_top)));
-        //get the starting x
-        let mut x = f32::trunc(view.left / step) * step;
+        
+        //construct all the vertical lines within view, with an step
+        let mut x = f32::trunc(view.left / step) * step; //fancy line for finding the first x-pos
         while x < view.right {
             lines.push(VerticalLine::new(x, view.bottom, view.top, 2f32, [0.3, 0.3, 0.3]));
             x += step;
         }
 
+        //construct all the horizontal lines within view, with a step
         let mut y = f32::trunc(view.bottom / step) * step;
         while y < view.top {
             lines.push(HorizontalLine::new(y, view.left, view.right, 2f32, [0.3, 0.3, 0.3]));
             y += step;
         }
 
+        //construct our axis in a different color
         lines.push(VerticalLine::new(0f32, view.bottom, view.top, 4f32, [0f32, 0f32, 0f32]));
         lines.push(HorizontalLine::new(0f32, view.left, view.right, 4f32, [0f32, 0f32, 0f32]));
+        //temp test of a line
         lines.push(Line {width: 3f32, start: (0f32, 0f32), end: (64f32, 64f32), color: [1f32, 0f32, 0f32]});
 
         lines

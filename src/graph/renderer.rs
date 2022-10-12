@@ -7,7 +7,7 @@ use super::{
     camera::{CameraController, CameraMatrix},
     vertex::Vertex, line::{LineList, Line}, renderable::Renderable, view::View
 };
-use crate::{render_context::RenderContext, renderer::Renderer, graph::camera};
+use crate::{render_context::RenderContext, renderer::Renderer};
 
 //TODO: creating future renderers will be simpler if i abstract out the idea of a uniform
 //idea for a point renderer, render a square and then turn it into a circle in the fragment shader
@@ -37,8 +37,8 @@ pub struct GraphRenderer {
     renderables_len: usize,
 
     //cached vertex and index buffers
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
+    vertex_buffer: Option<wgpu::Buffer>,
+    index_buffer: Option<wgpu::Buffer>,
     num_indices: u32
 }
 
@@ -60,29 +60,8 @@ impl GraphRenderer {
         let render_pipeline =
             Self::construct_render_pipeline(&render_context, &[&camera_bind_group_layout]);
         
-        let vertices: Vec<Vertex> = Vec::new();
-        let indices: Vec<u16> = Vec::new();
-        println!("{:?}", vertices);
-
-        //TODO remove this test code
-        let vertex_buffer =
-            render_context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(vertices.as_slice()),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-
-        let index_buffer =
-            render_context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(indices.as_slice()),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-        let num_indices = indices.len() as u32;
+        //dont initialize buffers here, because they will only be destroyed
+        //instead before we render make sure there are actually vertices to render
 
         let background_color = wgpu::Color {
             r: 1.0,
@@ -96,21 +75,18 @@ impl GraphRenderer {
             render_pipeline,
             background_color,
 
-            //camera info
             cam_controller,
             view_changed: true, //update objects before rendering
 
             camera_buffer,
             camera_bind_group,
             
-            //ECS
             renderables,
-
             renderables_len: 0,
 
-            vertex_buffer,
-            index_buffer,
-            num_indices
+            vertex_buffer: None,
+            index_buffer: None,
+            num_indices: 0
         }
     }
 
@@ -124,7 +100,6 @@ impl GraphRenderer {
         wgpu::BindGroup,
     ) {
         let camera_matrix: CameraMatrix = cam_controller.clone().into();
-        println!("{:?}", camera_matrix);
 
         let camera_buffer =
             render_context
@@ -247,73 +222,85 @@ impl GraphRenderer {
             lines.append_vec(&next_lines, &view);
         }
 
-        let vertices: Vec<Vertex> = lines.vertices;
-        let indices: Vec<u16> = lines.indices;
+        let vertices: &[Vertex] = lines.vertices();
+        let indices: &[u16] = lines.indices();
 
-        //TODO remove this test code
-        self.vertex_buffer =
-            self.render_context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(vertices.as_slice()),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+        if vertices.len() > 0 && indices.len() > 0 {
+            //out with the old
+            if let Some(vbuffer) = &self.vertex_buffer {
+                wgpu::Buffer::destroy(vbuffer);
+            }
+            if let Some(ibuffer) = &self.index_buffer {
+                wgpu::Buffer::destroy(ibuffer);
+            }
 
-        self.index_buffer =
-            self.render_context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(indices.as_slice()),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-        self.num_indices = indices.len() as u32;
+            //in with the new
+            self.vertex_buffer = Some(
+                self.render_context
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Vertex Buffer"),
+                        contents: bytemuck::cast_slice(vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }));
+
+            self.index_buffer = Some(
+                self.render_context
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Index Buffer"),
+                        contents: bytemuck::cast_slice(indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    }));
+            self.num_indices = indices.len() as u32;
+        }
     }
 }
 
 impl Renderer for GraphRenderer {
     fn render(&self) -> Result<(), wgpu::SurfaceError> {
-        //render using our pipeline
-        let output = self.render_context.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        if let Some(vertex_buffer) = &self.vertex_buffer {
+        if let Some(index_buffer) = &self.index_buffer {
+            //render using our pipeline
+            let output = self.render_context.surface.get_current_texture()?;
+            let view = output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder =
-            self.render_context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
+            let mut encoder =
+                self.render_context
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("Render Encoder"),
+                    });
+
+            {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(self.background_color),
+                            store: true,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
                 });
 
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.background_color),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
+                render_pass.set_pipeline(&self.render_pipeline);
+                render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            }
 
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
-        }
+            self.render_context
+                .queue
+                .submit(std::iter::once(encoder.finish()));
 
-        self.render_context
-            .queue
-            .submit(std::iter::once(encoder.finish()));
-
-        output.present();
-
+            output.present();
+        }}
         Ok(())
     }
 

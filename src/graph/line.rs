@@ -20,6 +20,8 @@ pub struct Line {
 
 impl Line {
     pub fn get_vertices(&self, view: &View) -> Vec<Vertex> {
+        //some fancy trigonometry for generating 4 points from start and end of line
+        //could probably do some math optimization here
         let half_width = self.width / 2f32;
         let se_length = ((self.start.0 - self.end.0).powf(2f32) + (self.start.1 - self.end.1).powf(2f32)).sqrt();
         let sf = half_width / se_length;
@@ -55,8 +57,8 @@ impl Line {
 //TODO: maybe make this private members with getters
 #[derive(Clone)]
 pub struct LineList {
-    pub vertices: Vec<Vertex>,
-    pub indices: Vec<u16>
+    vertices: Vec<Vertex>,
+    indices: Vec<u16>
 }
 
 impl LineList {
@@ -94,9 +96,17 @@ impl LineList {
         self.indices.append(&mut adjusted_indices);
     }
 
-    pub fn append_vec(&mut self, vec: &Vec<Line>, view: &View) {
-        for line in vec {
+    pub fn append_vec(&mut self, lines: &[Line], view: &View) {
+        for line in lines {
             self.add_line(line, view)
         }
+    }
+
+    pub fn vertices(&self) -> &[Vertex] {
+        self.vertices.as_ref()
+    }
+
+    pub fn indices(&self) -> &[u16] {
+        self.indices.as_ref()
     }
 }
