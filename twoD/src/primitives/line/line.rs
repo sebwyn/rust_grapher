@@ -1,7 +1,6 @@
-use super::{vertex::Vertex, view::View};
+use super::Vertex;
 
-//another option is to instance draw, this will use more memory and is probably worse
-//but may make updating cpu vertex buffers more simple
+use crate::View;
 
 //we're basically going to need a way to decide what lines to pass to our renderer
 //because we're working in infinite space
@@ -69,7 +68,7 @@ impl LineList {
         }
     }
 
-    pub fn _construct_from_vec(vec: &Vec<Line>, view: &View) -> Self {
+    pub fn _construct_from_vec(vec: &[Line], view: &View) -> Self {
         let mut line_list = LineList::new();
         for line in vec {
             line_list.add_line(line, view);

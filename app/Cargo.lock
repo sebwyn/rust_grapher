@@ -1133,6 +1133,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1382d1f0a252c4bf97dc20d979a2fdd05b024acd7c2ed0f7595d7817666a157"
 
 [[package]]
+name = "rendering"
+version = "0.1.0"
+
+[[package]]
 name = "rust_grapher"
 version = "0.1.0"
 dependencies = [
@@ -1142,6 +1146,8 @@ dependencies = [
  "image",
  "log",
  "pollster",
+ "rendering",
+ "twoD",
  "wgpu",
  "winit",
 ]
@@ -1351,6 +1357,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "twoD"
+version = "0.1.0"
+dependencies = [
+ "rendering",
 ]
 
 [[package]]

@@ -1,4 +1,5 @@
-//this object will be passed to renderable components so they can update their vertex buffers
+//this object is created by a camera and used by renderable objects
+//views will change depending on the camera, for example this is a 2d ortho view
 pub struct View {
     pub left: f32,
     pub right: f32,

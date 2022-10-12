@@ -1,3 +1,6 @@
+//this camera is a common construct in many render pipelines
+//and will therefore be passed to a render pipeline object and hopefully
+//baked correctly into the layout
 struct CameraUniform {
     view_ortho: mat4x4<f32>
 }

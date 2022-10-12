@@ -3,11 +3,12 @@ use std::{rc::Rc, cell::RefCell};
 use wgpu::util::DeviceExt;
 use winit::{window::Window, event::WindowEvent};
 
+//use the 2d crate for this renderer
+use 2d::
+
 use super::{
-    camera::{CameraController, CameraMatrix},
-    vertex::Vertex, line::LineList, renderable::Renderable, view::View
+    camera::{CameraController, CameraMatrix}, renderable::Renderable, view::View
 };
-use crate::{render_context::RenderContext, renderer::Renderer};
 
 //TODO: creating future renderers will be simpler if i abstract out the idea of a uniform
 //idea for a point renderer, render a square and then turn it into a circle in the fragment shader
