@@ -1,29 +1,28 @@
 use unique_type_id::UniqueTypeId;
-use core::arch;
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::archetype::{ArchetypeId, ComponentId, Type, Archetype};
 
 type EntityId = usize;
 
+#[derive(Clone, Copy)]
 struct Record {
-    archetype: ArchetypeId,
+    archetype_id: ArchetypeId,
     row: usize
 }
 
-struct ComponentRecord {
-    column: usize,
-}
-
-type ArchetypeMap = HashMap<ArchetypeId, ComponentRecord>;
+type ArchetypeMap = HashMap<ArchetypeId, u64>;
 
 //a fancy list of archetypes
 pub struct ECS {
     archetypes: Vec<Archetype>,
 
-    entity_index: HashMap<EntityId, Record>,
-    archetype_index: HashMap<Type, ArchetypeId>,
-    component_index: HashMap<ComponentId, ArchetypeMap>,
+    entity_index: HashMap<EntityId, Record>, //map entities to their archetype and position within archetype
+    archetype_index: HashMap<Type, ArchetypeId>, //map lists of components to the respective archetype
+    component_index: HashMap<ComponentId, ArchetypeMap>, //map components to maps of archetyps and columns
+
+    //map components to their size for archetype creation and such
+    component_size_index: HashMap<ComponentId, usize>,
 
     highest_entity_id: EntityId,
     next_archetype_id: ArchetypeId,
@@ -37,6 +36,8 @@ impl ECS {
             entity_index: HashMap::new(),
             archetype_index: HashMap::new(),
             component_index: HashMap::new(),
+
+            component_size_index: HashMap::new(),
 
             highest_entity_id: 0,
             next_archetype_id: 0,
@@ -67,7 +68,7 @@ impl ECS {
         //since empty archetypes don't have components we can cheat and use 0 for the row
         //when creating entities of other archetypes we need to get the row
         self.entity_index
-            .insert(self.highest_entity_id, Record { archetype: empty_archetype, row: 0});
+            .insert(self.highest_entity_id, Record { archetype_id: empty_archetype, row: 0});
         self.highest_entity_id
     }
 
@@ -75,15 +76,18 @@ impl ECS {
     where
         T: UniqueTypeId<u64>
     {
+        //if we're adding a component that is new add the size to the size index as well
+
+
         //look up the archetype
         let record = self.entity_index.get(&entity).expect("Adding component to null entity");
         //TODO: maybe check if this type already has this component, but this is slow
         //transition along edge
         let new_component_id: ComponentId = T::id().0;
 
-        let old_archetype_id = record.archetype;
+        let old_archetype_id = record.archetype_id;
         //get the new archetype_id by traversing edges, or creating edges/creating archetypes
-        let new_archetype_id = if let Some(archetype_edge) = self.archetypes[record.archetype].edges.get(&new_component_id) {
+        let new_archetype_id = if let Some(archetype_edge) = self.archetypes[record.archetype_id].edges.get(&new_component_id) {
             //transition here
             archetype_edge.add.expect("An edge is defined and this entity already has this component")
         } else {
@@ -109,5 +113,25 @@ impl ECS {
             new_archetype_id
         };
 
+
+    }
+
+    pub fn get_component<T>(&self, entity: EntityId) -> Option<&T>
+    where 
+        T: UniqueTypeId<u64>
+    {
+        let entity_record = self.entity_index[&entity];
+        let archetype_id: ArchetypeId = entity_record.archetype_id;
+        
+        let component_record = &self.component_index[&T::id().0];
+        let column = component_record.get(&archetype_id);
+        
+        if column.is_none() {
+            return None
+        } // at this point we column is defined
+        let column = column.expect("Our return didn't work?");
+
+        None
+        //self.archetypes[archetype_id].get::<T>(*column, entity_record.row)
     }
 }

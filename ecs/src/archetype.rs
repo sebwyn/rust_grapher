@@ -1,6 +1,6 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap};
 
-use super::component_array::BoxedComponentArray;
+use super::component_array::ComponentArray;
 
 pub type ComponentId = u64;
 pub type ArchetypeId = usize;
@@ -31,7 +31,7 @@ pub struct Archetype {
     pub id: ArchetypeId, //helpful for early printing
     pub types: Type,
     pub current_row: usize,
-    pub components: Vec<BoxedComponentArray>,
+    pub components: Vec<ComponentArray>,
     pub edges: HashMap<ComponentId, ArchetypeEdge>,
 }
 
@@ -52,6 +52,20 @@ impl Archetype {
     pub fn add_edge_to_new(&mut self, component_id: ComponentId, new_archetype_id: ArchetypeId){
         self.edges.insert(component_id, ArchetypeEdge::old_to_new(new_archetype_id));
     }
+
+    /*
+    pub fn get<T>(&self, column: ComponentId, row: usize) -> Option<&T> {
+        //cast our BoxedComponent array to a typed array
+        let vec = unsafe { self.components[column as usize].cast::<T>() };
+        vec.get(row)
+    }
+    */
+
+    /*
+    pub fn get_components<T>(&self, column: ComponentId) -> &Vec<T> {
+    }
+    */
+
     /*
     fn insert_components(components: Iter<BoxedComponents>) -> usize {
 

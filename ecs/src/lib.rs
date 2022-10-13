@@ -8,22 +8,30 @@ pub use crate::ecs::ECS;
 
 #[cfg(test)]
 mod test {
-    use super::component_array::{ComponentArray, BoxedComponentArray};
+    use super::component_array::ComponentArray;
     use crate::ECS;
 
-    #[test]
-    fn test_boxed_component_array() {
-        //create a list of int components
-        let mut components = ComponentArray::<i32>::new();
-        for i in 0..10 {
-            components.push(i);
-        }
-        let component_array: BoxedComponentArray = BoxedComponentArray::new(&mut components);
+    #[derive(Debug, Clone, PartialEq)]
+    struct MyComponent {
+        x: f32,
+        y: f32,
+    }
 
-        //down cast our component array
-        let vec: &mut ComponentArray<i32> = unsafe { BoxedComponentArray::cast::<i32>(&component_array) };
+    #[test]
+    fn test_component_array() {
+        //create a list of int components
+        let mut components: Vec<MyComponent> = Vec::new();
+        for i in 0..10 {
+            components.push(MyComponent { x: i as f32, y: i as f32});
+        }
+        println!("{:?}", components);
+        let mut component_array: ComponentArray = ComponentArray::from_slice(&components);
+
         //ensure the elements are equal
-        assert!(components.len() == vec.len(), "Their lengths didn't match");
+        components.reverse();
+        for og_component in components.into_iter() {
+            assert_eq!(og_component, component_array.pop::<MyComponent>().unwrap())
+        }
     }
 
     #[test]
