@@ -1,22 +1,25 @@
-pub type ComponentArray<T> = Vec<(usize, T)>;
+use std::intrinsics::size_of;
 
-//if i can cast a component array back to a listOfComponents then we're all good
-pub trait BoxedComponentArray {
-    fn get_raw_ptr(&mut self) -> *mut u8;
+pub type ComponentArray<T> = Vec<T>;
+
+pub struct BoxedComponentArray {
+    ptr: *mut u8,
+    element_size: usize,
+    size: usize
 }
 
-impl<T> BoxedComponentArray for Box<ComponentArray<T>> {
-    fn get_raw_ptr(&mut self) -> *mut u8 {
-        let ptr = &mut **self as *mut ComponentArray<T>;
-        ptr as *mut u8
+impl BoxedComponentArray {
+    pub fn new<T>(component_array: &mut ComponentArray<T>) -> Self {
+        let p = component_array as *mut ComponentArray<T>;
+        Self {
+            ptr: p as *mut u8,
+            element_size: size_of::<T>(),
+            size: 0
+        }
     }
-}
 
-pub trait CastToVec {
-    unsafe fn cast<T>(&mut self) -> &mut Vec<T>;
-}
-
-pub unsafe fn cast_to_component_array<T>(component_array: &mut Box<dyn BoxedComponentArray>) -> &mut ComponentArray<T> {
-    let cast_pointer = component_array.get_raw_ptr() as *mut ComponentArray<T>;
-    cast_pointer.as_mut().expect("Cannot cast a null component array")
+    pub unsafe fn cast<T>(&self) -> &mut ComponentArray<T> {
+        let ptr = self.ptr as *mut ComponentArray<T>;
+        ptr.as_mut().expect("Trying to cast a null BoxedComponentArray")
+    }
 }
