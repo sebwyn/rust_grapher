@@ -1,4 +1,4 @@
-use std::{rc::Rc, cell::RefCell};
+use bevy_ecs::prelude::*;
 
 use winit::{
     event::*,
@@ -6,7 +6,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-use crate::graph::{GraphRenderer, GridLines, Renderable, Normal};
+use crate::graph::GraphRenderContext;
 
 pub struct App;
 
@@ -21,12 +21,11 @@ impl App {
             .build(&event_loop)
             .unwrap();
 
-        //create our renderables here
-        let renderables: Rc<RefCell<Vec<Box<dyn Renderable>>>> = Rc::new(RefCell::new(Vec::new()));
+        //create our world here, and add renderables to it
+        let world = World::new();
+        
         //create our renderer and our graph here
-        let mut renderer = GraphRenderer::new(&window, renderables.clone()).await;
-        renderables.borrow_mut().push(Box::new(GridLines {}));
-        renderables.borrow_mut().push(Box::new(Normal { deviation: 0.1f32, mean: 0f32 }));
+        let mut graph_render_context = GraphRenderContext::new(&window).await;
 
         //store a flag for if our view changed and then update all the components before rendering
         event_loop.run(move |event, _, control_flow| match event {

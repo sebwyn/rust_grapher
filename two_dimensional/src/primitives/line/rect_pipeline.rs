@@ -1,29 +1,105 @@
-use std::rc::Weak;
+use bevy_ecs::prelude::*;
+
 use rendering::RenderContext;
 use wgpu::util::DeviceExt;
 
-use super::{line::LineList, Line, LineVertex};
+use super::{line::LineList, LineVertex};
 use crate::View;
 
 //TODO this object should take a view of an ECS
 //where all it can see is Rect objects, but for now
 pub struct RectPipeline {
     pipeline: wgpu::RenderPipeline,
-    render_context_ptr: Weak<RenderContext>
 }
 
-pub struct LineVertices {
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
+pub struct CameraUniform {
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+    buffer: wgpu::Buffer,
+}
+
+pub struct RenderPassData {
+    pub view: View,
+    pub lines: LineList,
+}
+
+fn generate_buffers(
+    render_context: &RenderContext,
+    lines: LineList,
+) -> (wgpu::Buffer, wgpu::Buffer, u32) {
+    let vertices: &[LineVertex] = lines.vertices();
+    let indices: &[u16] = lines.indices();
+
+    //in with the new
+    let vertex_buffer =
+        render_context
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+    let index_buffer =
+        render_context
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(indices),
+                usage: wgpu::BufferUsages::INDEX,
+            });
+    let num_indices = indices.len() as u32;
+
+    (vertex_buffer, index_buffer, num_indices)
+}
+
+//define a bevy render system
+pub fn render(
+    In(render_pass_data): In<RenderPassData>,
+    rect_pipeline: Res<RectPipeline>,
+    render_context: Res<RenderContext>,
+    surface_view: Res<wgpu::TextureView>,
+    camera_uniform: Res<CameraUniform>,
+    mut command_buffers: ResMut<Vec<wgpu::CommandBuffer>>,
+) {
+    //generate our vertex and index buffers here from our vertex data and index data
+    let (vertex_buffer, index_buffer, num_indices) =
+        generate_buffers(&render_context, render_pass_data.lines);
+
+    let mut encoder =
+        render_context
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Line Command Encoder"),
+            });
+
+    {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &surface_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+
+        render_pass.set_pipeline(&rect_pipeline.pipeline);
+        render_pass.set_bind_group(0, &camera_uniform.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..num_indices, 0, 0..1);
+    }
+
+    command_buffers.as_mut().push(encoder.finish());
 }
 
 impl RectPipeline {
-    fn new(render_context_ptr: Weak<RenderContext>, camera_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(render_context: &RenderContext, camera_layout: &wgpu::BindGroupLayout) -> Self {
         let bind_group_layouts = &[camera_layout];
-
-        //upgrade the pointer here for the duration of new
-        let render_context = render_context_ptr.upgrade().expect("Passed a deconstructed render context to render pipeline");
 
         let shader = render_context
             .device
@@ -83,53 +159,6 @@ impl RectPipeline {
                     },
                     multiview: None, // 5.
                 });
-        Self {
-            pipeline,
-            render_context_ptr
-        }
-    }
-
-    fn generate_buffers(&self, lines: &[Line], view: &View) -> LineVertices {
-        //upgrade render context here
-        let render_context = self.render_context_ptr.upgrade().expect("Can't generate line vertice buffers on a freed render context");
-        
-        let lines = LineList::_construct_from_vec(lines, view);
-
-        let vertices: &[LineVertex] = lines.vertices();
-        let indices: &[u16] = lines.indices();
-
-        //in with the new
-        let vertex_buffer =
-            render_context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-
-        let index_buffer =
-            render_context
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-        let num_indices = indices.len() as u32;
-
-        LineVertices {
-            vertex_buffer,
-            index_buffer,
-            num_indices
-        }
-    }
-
-    //take in a vertex buffer that has been created from this object
-    fn render(&self, lines: LineVertices) {
-        //again upgrade our render context
-        let render_context = self.render_context_ptr.upgrade().expect("Can't render lines with an invalid context");
-
-        
+        Self { pipeline }
     }
 }
